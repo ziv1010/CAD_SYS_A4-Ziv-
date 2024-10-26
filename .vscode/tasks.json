@@ -1,0 +1,46 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "C/C++: g++ build active file",
+			"command": "/usr/bin/g++",
+			"args": [
+				"-std=c++17",
+				"-fdiagnostics-color=always",
+				"-Wall",
+				"-g",
+				"-I/Users/ziv/Desktop/EngDraw_copy_2/dependencies/include",    // Custom includes
+				"-I/opt/homebrew/opt/glfw/include",                     // Include path for GLFW
+				"-I/opt/homebrew/opt/glew/include",                     // Include path for GLEW
+				"-I/opt/homebrew/opt/glm/include",                      // Include path for GLM
+				"-L/Users/ziv/Desktop/EngDraw_copy_2/dependencies/library",    // Custom library path
+				"-L/opt/homebrew/opt/glfw/lib",                         // Library path for GLFW
+				"-L/opt/homebrew/opt/glew/lib",                         // Library path for GLEW
+				"-L/opt/homebrew/opt/glm/lib",                          // Library path for GLM (if applicable)
+				"${workspaceFolder}/*.cpp",
+				"${workspaceFolder}/glad.c",
+				"-lglfw",                                               // Link GLFW
+				"-lGLEW",                                               // Link GLEW
+				"-o", "${workspaceFolder}/app",                         // Output file
+				"-framework", "OpenGL",                                 // OpenGL framework
+				"-framework", "Cocoa",                                  // Cocoa framework (macOS)
+				"-framework", "IOKit",
+				"-framework", "CoreVideo",
+				"-framework", "CoreFoundation",
+				"-Wno-deprecated"
+			],
+			"options": {
+				"cwd": "${fileDirname}"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "compiler: /usr/bin/g++"
+		}
+	]
+}
