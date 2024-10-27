@@ -4,6 +4,9 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
+#include <map>
+#include <set>
+
 
 void WireframeModel::generateProbableVertices(const Graph2D& topView, const Graph2D& frontView, const Graph2D& sideView) {
     // Maps to find matching coordinates
@@ -64,25 +67,162 @@ void WireframeModel::generateProbableVertices(const Graph2D& topView, const Grap
     }
 }
 
-void WireframeModel::writeVerticesToFile(const std::string& filename) const {
+void WireframeModel::generateProbableEdges(const Graph2D& topView, const Graph2D& frontView, const Graph2D& sideView) {
+    std::cout << "[Debug] Generating probable 3D edges..." << std::endl;
+
+    // For each pair of probable vertices
+    for (size_t i = 0; i < probableVertices.size(); ++i) {
+        for (size_t j = i + 1; j < probableVertices.size(); ++j) {
+            const Vertex3D& v1 = probableVertices[i];
+            const Vertex3D& v2 = probableVertices[j];
+
+            // Check if their projections correspond to edges in the 2D views
+            bool edgeInTopView = false;
+            bool edgeInFrontView = false;
+            bool edgeInSideView = false;
+
+            // Check Top View
+            Point2D p1_top(v1.x, v1.z); // Top view projects onto x-z plane
+            Point2D p2_top(v2.x, v2.z);
+            for (const auto& edge : topView.edges) {
+                const Point2D& e1 = topView.vertices[edge.startIdx];
+                const Point2D& e2 = topView.vertices[edge.endIdx];
+                if ((p1_top == e1 && p2_top == e2) || (p1_top == e2 && p2_top == e1)) {
+                    edgeInTopView = true;
+                    break;
+                }
+            }
+
+            // Check Front View
+            Point2D p1_front(v1.x, v1.y); // Front view projects onto x-y plane
+            Point2D p2_front(v2.x, v2.y);
+            for (const auto& edge : frontView.edges) {
+                const Point2D& e1 = frontView.vertices[edge.startIdx];
+                const Point2D& e2 = frontView.vertices[edge.endIdx];
+                if ((p1_front == e1 && p2_front == e2) || (p1_front == e2 && p2_front == e1)) {
+                    edgeInFrontView = true;
+                    break;
+                }
+            }
+
+            // Check Side View
+            Point2D p1_side(v1.y, v1.z); // Side view projects onto y-z plane
+            Point2D p2_side(v2.y, v2.z);
+            for (const auto& edge : sideView.edges) {
+                const Point2D& e1 = sideView.vertices[edge.startIdx];
+                const Point2D& e2 = sideView.vertices[edge.endIdx];
+                if ((p1_side == e1 && p2_side == e2) || (p1_side == e2 && p2_side == e1)) {
+                    edgeInSideView = true;
+                    break;
+                }
+            }
+
+            // Decide if the edge should be added
+            int lineCount = edgeInTopView + edgeInFrontView + edgeInSideView;
+            if (lineCount >= 2) {
+                // Edge appears in at least two views
+                Edge3D edge(i, j);
+                // Check for redundancy
+                auto it = std::find(probableEdges.begin(), probableEdges.end(), edge);
+                if (it == probableEdges.end()) {
+                    probableEdges.push_back(edge);
+                    std::cout << "[Debug] Added Edge3D from Vertex " << i << " to Vertex " << j << std::endl;
+                }
+            }
+        }
+    }
+}
+
+void WireframeModel::validateVerticesAndEdges() {
+    std::cout << "[Debug] Validating vertices and edges..." << std::endl;
+    bool changesMade;
+    do {
+        changesMade = false;
+        // Build adjacency list
+        std::map<int, std::set<int>> adjacencyList;
+        for (const auto& edge : probableEdges) {
+            adjacencyList[edge.startIdx].insert(edge.endIdx);
+            adjacencyList[edge.endIdx].insert(edge.startIdx);
+        }
+
+        // Find invalid vertices
+        std::set<int> invalidVertices;
+        for (size_t i = 0; i < probableVertices.size(); ++i) {
+            int connections = adjacencyList[i].size();
+            if (connections < 3) {
+                invalidVertices.insert(i);
+                std::cout << "[Debug] Vertex " << i << " is invalid (connections: " << connections << ")" << std::endl;
+            }
+        }
+
+        if (!invalidVertices.empty()) {
+            changesMade = true;
+            // Remove invalid vertices and associated edges
+            std::vector<Vertex3D> newVertices;
+            std::vector<int> indexMap(probableVertices.size(), -1);
+            int newIndex = 0;
+            for (size_t i = 0; i < probableVertices.size(); ++i) {
+                if (invalidVertices.find(i) == invalidVertices.end()) {
+                    newVertices.push_back(probableVertices[i]);
+                    indexMap[i] = newIndex++;
+                } else {
+                    std::cout << "[Debug] Removing Vertex " << i << std::endl;
+                }
+            }
+
+            probableVertices = newVertices;
+
+            // Update edges
+            std::vector<Edge3D> newEdges;
+            for (const auto& edge : probableEdges) {
+                if (invalidVertices.find(edge.startIdx) == invalidVertices.end() &&
+                    invalidVertices.find(edge.endIdx) == invalidVertices.end()) {
+                    Edge3D newEdge(indexMap[edge.startIdx], indexMap[edge.endIdx]);
+                    newEdges.push_back(newEdge);
+                } else {
+                    std::cout << "[Debug] Removing Edge from Vertex " << edge.startIdx << " to Vertex " << edge.endIdx << std::endl;
+                }
+            }
+
+            probableEdges = newEdges;
+        }
+
+    } while (changesMade);
+
+    std::cout << "[Debug] Validation complete." << std::endl;
+}
+
+void WireframeModel::writeToFile(const std::string& filename) const {
     std::ofstream outfile(filename);
     if (!outfile.is_open()) {
         std::cerr << "[Error] Cannot open output file " << filename << std::endl;
         return;
     }
 
-    outfile << "Probable 3D Vertices:" << std::endl;
-    for (const auto& v : probableVertices) {
-        outfile << v.x << " " << v.y << " " << v.z << std::endl;
+    outfile << "Vertices:" << std::endl;
+    for (size_t i = 0; i < probableVertices.size(); ++i) {
+        const auto& v = probableVertices[i];
+        outfile << i << ": " << v.x << " " << v.y << " " << v.z << std::endl;
+    }
+
+    outfile << "Edges:" << std::endl;
+    for (const auto& edge : probableEdges) {
+        outfile << edge.startIdx << " " << edge.endIdx << std::endl;
     }
 
     outfile.close();
-    std::cout << "[Debug] Probable 3D vertices written to " << filename << std::endl;
+    std::cout << "[Debug] Wireframe model written to " << filename << std::endl;
 }
 
 void WireframeModel::print() const {
     std::cout << "Probable 3D Vertices:" << std::endl;
-    for (const auto& v : probableVertices) {
-        v.print();
+    for (size_t i = 0; i < probableVertices.size(); ++i) {
+        std::cout << "Vertex " << i << ": ";
+        probableVertices[i].print();
+    }
+
+    std::cout << "Probable 3D Edges:" << std::endl;
+    for (const auto& edge : probableEdges) {
+        edge.print();
     }
 }

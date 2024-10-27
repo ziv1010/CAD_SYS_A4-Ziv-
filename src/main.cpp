@@ -28,8 +28,17 @@ int main() {
     WireframeModel wireframe;
     wireframe.generateProbableVertices(topView, frontView, sideView);
 
-    // Write probable 3D vertices to output file
-    wireframe.writeVerticesToFile("output.txt");
+    // Generate probable 3D edges
+    wireframe.generateProbableEdges(topView, frontView, sideView);
+
+    // Validate vertices and edges
+    wireframe.validateVerticesAndEdges();
+
+    // Write wireframe model to output file
+    wireframe.writeToFile("output.txt");
+
+    // Optionally, print the wireframe model
+    wireframe.print();
 
     return 0;
 }
