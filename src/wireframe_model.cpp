@@ -336,15 +336,6 @@ Vertex3D WireframeModel::edgeVector(int startIdx, int endIdx) const {
     return Vertex3D(endVertex.x - startVertex.x, endVertex.y - startVertex.y, endVertex.z - startVertex.z);
 }
 
-// Helper method to compute cross product of two vectors
-Vertex3D WireframeModel::crossProduct(const Vertex3D& a, const Vertex3D& b) const {
-    return Vertex3D(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
-    );
-}
-
 void WireframeModel::generateProbableFaces() {
     std::cout << "[Debug] Generating probable faces..." << std::endl;
 
@@ -362,8 +353,6 @@ void WireframeModel::generateProbableFaces() {
     // For each vertex
     for (size_t vi = 0; vi < probableVertices.size(); ++vi) {
         int v_i = vi;
-        const Vertex3D& vertex_i = probableVertices[v_i];
-
         // Get adjacent edges
         std::vector<int> adjacentEdges = vertexToEdges[v_i];
 
@@ -485,13 +474,27 @@ void WireframeModel::generateProbableFaces() {
 
                 if (faceCompleted) {
                     // Create face
-                    // Sort vertex indices to avoid duplicates
                     std::vector<int> faceVertexIndices = faceVertices;
                     std::sort(faceVertexIndices.begin(), faceVertexIndices.end());
 
                     if (uniqueFaces.find(faceVertexIndices) == uniqueFaces.end()) {
                         uniqueFaces.insert(faceVertexIndices);
-                        probableFaces.push_back(Face3D(faceVertices));
+
+                        // Create a Face3D object
+                        Face3D face(faceVertices);
+
+                        // Store edge indices forming the face
+                        face.edgeIndices = faceEdges; // faceEdges is a vector of edge indices
+
+                        // Add the face to probableFaces
+                        probableFaces.push_back(face);
+
+                        // Now, for each edge in faceEdges, add the face index to the edge's adjacentFaces
+                        int faceIdx = probableFaces.size() - 1;
+                        for (int edgeIdx : faceEdges) {
+                            probableEdges[edgeIdx].adjacentFaces.push_back(faceIdx);
+                        }
+
                         std::cout << "[Debug] Found probable face with vertices:";
                         for (int idx : faceVertices) {
                             std::cout << " " << idx;
@@ -504,4 +507,304 @@ void WireframeModel::generateProbableFaces() {
     }
 
     std::cout << "[Debug] Total probable faces found: " << probableFaces.size() << std::endl;
+    
+}
+
+bool WireframeModel::applyRule1(Edge3D& edge, std::vector<Face3D>& faces) {
+    if (edge.status == EdgeStatus::TRUE_EDGE) {
+        int trueFaceCount = 0;
+        for (int faceIdx : edge.adjacentFaces) {
+            if (faces[faceIdx].status == FaceStatus::TRUE_FACE) {
+                trueFaceCount++;
+            }
+        }
+        if (trueFaceCount > 2) {
+            // Contradicts Moëbius Rule
+            return false;
+        } else if (trueFaceCount == 2 && edge.adjacentFaces.size() > 2) {
+            // Set remaining faces to false
+            for (int faceIdx : edge.adjacentFaces) {
+                if (faces[faceIdx].status == FaceStatus::UNDECIDED) {
+                    faces[faceIdx].status = FaceStatus::FALSE_FACE;
+                    std::cout << "[Debug] Applying Rule 1: Setting Face " << faceIdx << " to FALSE\n";
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool WireframeModel::applyRule4(Edge3D& edge, std::vector<Face3D>& faces) {
+    if (edge.adjacentFaces.size() == 1 && edge.status == EdgeStatus::UNDECIDED) {
+        edge.status = EdgeStatus::FALSE_EDGE;
+        int faceIdx = edge.adjacentFaces[0];
+        faces[faceIdx].status = FaceStatus::FALSE_FACE;
+        std::cout << "[Debug] Applying Rule 4: Setting Edge (" << edge.startIdx << ", " << edge.endIdx << ") and Face " << faceIdx << " to FALSE\n";
+        return true;
+    }
+    return false;
+}
+
+bool WireframeModel::areFacesCoplanar(const Face3D& face1, const Face3D& face2) {
+    // Compute normals of both faces and compare
+    // For simplicity, assume faces are triangles or quads
+
+    // Ensure faces have at least 3 vertices
+    if (face1.vertexIndices.size() < 3 || face2.vertexIndices.size() < 3) {
+        return false;
+    }
+
+    // Compute normal of face1
+    const Vertex3D& v0 = probableVertices[face1.vertexIndices[0]];
+    const Vertex3D& v1 = probableVertices[face1.vertexIndices[1]];
+    const Vertex3D& v2 = probableVertices[face1.vertexIndices[2]];
+
+    Vertex3D normal1 = crossProduct(
+        Vertex3D(v1.x - v0.x, v1.y - v0.y, v1.z - v0.z),
+        Vertex3D(v2.x - v0.x, v2.y - v0.y, v2.z - v0.z)
+    );
+
+    // Compute normal of face2
+    const Vertex3D& u0 = probableVertices[face2.vertexIndices[0]];
+    const Vertex3D& u1 = probableVertices[face2.vertexIndices[1]];
+    const Vertex3D& u2 = probableVertices[face2.vertexIndices[2]];
+
+    Vertex3D normal2 = crossProduct(
+        Vertex3D(u1.x - u0.x, u1.y - u0.y, u1.z - u0.z),
+        Vertex3D(u2.x - u0.x, u2.y - u0.y, u2.z - u0.z)
+    );
+
+    // Normalize normals
+    float mag1 = sqrt(normal1.x * normal1.x + normal1.y * normal1.y + normal1.z * normal1.z);
+    float mag2 = sqrt(normal2.x * normal2.x + normal2.y * normal2.y + normal2.z * normal2.z);
+
+    if (mag1 < EPSILON || mag2 < EPSILON)
+        return false; // Degenerate face
+
+    normal1.x /= mag1; normal1.y /= mag1; normal1.z /= mag1;
+    normal2.x /= mag2; normal2.y /= mag2; normal2.z /= mag2;
+
+    // Check if normals are equal or opposite
+    float dot = normal1.x * normal2.x + normal1.y * normal2.y + normal1.z * normal2.z;
+    return std::fabs(dot) > (1.0f - EPSILON);
+}
+
+
+bool WireframeModel::applyRule5(Edge3D& edge, std::vector<Face3D>& faces) {
+    if (edge.adjacentFaces.size() == 2 && edge.status == EdgeStatus::UNDECIDED) {
+        int faceIdx1 = edge.adjacentFaces[0];
+        int faceIdx2 = edge.adjacentFaces[1];
+        const Face3D& face1 = faces[faceIdx1];
+        const Face3D& face2 = faces[faceIdx2];
+
+        if (areFacesCoplanar(face1, face2)) {
+            edge.status = EdgeStatus::FALSE_EDGE;
+            faces[faceIdx1].status = FaceStatus::TRUE_FACE;
+            faces[faceIdx2].status = FaceStatus::TRUE_FACE;
+            std::cout << "[Debug] Applying Rule 5: Setting Edge (" << edge.startIdx << ", " << edge.endIdx << ") to FALSE and merging Faces " << faceIdx1 << " and " << faceIdx2 << "\n";
+            // Merge faces if necessary
+            mergeFaces(faces[faceIdx1], faces[faceIdx2]);
+            return true;
+        }
+    }
+    return false;
+}
+bool WireframeModel::applyRule6(Edge3D& edge, std::vector<Face3D>& faces) {
+    if (edge.status == EdgeStatus::TRUE_EDGE && edge.adjacentFaces.size() == 2) {
+        int faceIdx1 = edge.adjacentFaces[0];
+        int faceIdx2 = edge.adjacentFaces[1];
+
+        const Face3D& face1 = faces[faceIdx1];
+        const Face3D& face2 = faces[faceIdx2];
+
+        if (!areFacesCoplanar(face1, face2)) {
+            if (faces[faceIdx1].status == FaceStatus::UNDECIDED) {
+                faces[faceIdx1].status = FaceStatus::TRUE_FACE;
+                std::cout << "[Debug] Applying Rule 6: Setting Face " << faceIdx1 << " to TRUE\n";
+            }
+            if (faces[faceIdx2].status == FaceStatus::UNDECIDED) {
+                faces[faceIdx2].status = FaceStatus::TRUE_FACE;
+                std::cout << "[Debug] Applying Rule 6: Setting Face " << faceIdx2 << " to TRUE\n";
+            }
+            return true;
+        }
+    }
+    return false;
+}
+bool WireframeModel::applyDecisionRules() {
+    bool changesMade = false;
+    bool contradiction = false;
+
+    do {
+        changesMade = false;
+
+        // Apply Rule 4 to all edges
+        for (auto& edge : probableEdges) {
+            if (applyRule4(edge, probableFaces)) {
+                changesMade = true;
+            }
+        }
+
+        // Apply Rule 5
+        for (auto& edge : probableEdges) {
+            if (applyRule5(edge, probableFaces)) {
+                changesMade = true;
+            }
+        }
+
+        // Apply Rule 6
+        for (auto& edge : probableEdges) {
+            if (applyRule6(edge, probableFaces)) {
+                changesMade = true;
+            }
+        }
+
+        // Apply Rule 1
+        for (auto& edge : probableEdges) {
+            if (!applyRule1(edge, probableFaces)) {
+                contradiction = true;
+                break;
+            }
+        }
+
+        if (contradiction) {
+            break;
+        }
+
+    } while (changesMade);
+
+    return !contradiction;
+}
+bool WireframeModel::decisionChaining() {
+    // Check if all edges and faces are decided
+    bool allDecided = true;
+    for (const auto& edge : probableEdges) {
+        if (edge.status == EdgeStatus::UNDECIDED) {
+            allDecided = false;
+            break;
+        }
+    }
+    if (allDecided) {
+        // Verify Moëbius Rule
+        if (verifyMoebiusRule()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // Select an undecided edge
+    for (size_t idx = 0; idx < probableEdges.size(); ++idx) {
+        Edge3D& edge = probableEdges[idx];
+        if (edge.status == EdgeStatus::UNDECIDED) {
+            // Try setting the edge to TRUE_EDGE
+            edge.status = EdgeStatus::TRUE_EDGE;
+            std::cout << "[Debug] Trying Edge (" << edge.startIdx << ", " << edge.endIdx << ") as TRUE\n";
+
+            // Save current state
+            auto savedEdges = probableEdges;
+            auto savedFaces = probableFaces;
+
+            if (applyDecisionRules() && decisionChaining()) {
+                return true;
+            }
+
+            // Backtrack
+            probableEdges = savedEdges;
+            probableFaces = savedFaces;
+
+            // Try setting the edge to FALSE_EDGE
+            edge.status = EdgeStatus::FALSE_EDGE;
+            std::cout << "[Debug] Trying Edge (" << edge.startIdx << ", " << edge.endIdx << ") as FALSE\n";
+
+            if (applyDecisionRules() && decisionChaining()) {
+                return true;
+            }
+
+            // Backtrack
+            probableEdges = savedEdges;
+            probableFaces = savedFaces;
+
+            // Cannot decide
+            edge.status = EdgeStatus::UNDECIDED;
+            return false;
+        }
+    }
+
+    return false;
+}
+void WireframeModel::removePseudoElements() {
+    std::cout << "[Debug] Removing pseudo elements..." << std::endl;
+
+    // Initialize statuses
+    for (auto& edge : probableEdges) {
+        edge.status = EdgeStatus::UNDECIDED;
+    }
+    for (auto& face : probableFaces) {
+        face.status = FaceStatus::UNDECIDED;
+    }
+
+    if (decisionChaining()) {
+        std::cout << "[Debug] Pseudo elements removed successfully.\n";
+
+        // Remove false edges and faces
+        probableEdges.erase(std::remove_if(probableEdges.begin(), probableEdges.end(),
+            [](const Edge3D& edge) { return edge.status == EdgeStatus::FALSE_EDGE; }), probableEdges.end());
+
+        probableFaces.erase(std::remove_if(probableFaces.begin(), probableFaces.end(),
+            [](const Face3D& face) { return face.status == FaceStatus::FALSE_FACE; }), probableFaces.end());
+    } else {
+        std::cout << "[Error] Could not resolve pseudo elements.\n";
+    }
+}
+
+Vertex3D WireframeModel::crossProduct(const Vertex3D& a, const Vertex3D& b) const {
+    return Vertex3D(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    );
+}
+
+void WireframeModel::mergeFaces(Face3D& face1, Face3D& face2) {
+    // Combine vertex indices
+    face1.vertexIndices.insert(face1.vertexIndices.end(), face2.vertexIndices.begin(), face2.vertexIndices.end());
+
+    // Remove duplicates
+    std::sort(face1.vertexIndices.begin(), face1.vertexIndices.end());
+    auto last = std::unique(face1.vertexIndices.begin(), face1.vertexIndices.end());
+    face1.vertexIndices.erase(last, face1.vertexIndices.end());
+
+    // Combine edge indices
+    face1.edgeIndices.insert(face1.edgeIndices.end(), face2.edgeIndices.begin(), face2.edgeIndices.end());
+
+    // Remove duplicates
+    std::sort(face1.edgeIndices.begin(), face1.edgeIndices.end());
+    last = std::unique(face1.edgeIndices.begin(), face1.edgeIndices.end());
+    face1.edgeIndices.erase(last, face1.edgeIndices.end());
+
+    // Mark face2 as false
+    face2.status = FaceStatus::FALSE_FACE;
+}
+
+
+bool WireframeModel::verifyMoebiusRule() {
+    // Verify that each edge is adjacent to exactly two faces
+    for (const auto& edge : probableEdges) {
+        int trueFaceCount = 0;
+        for (int faceIdx : edge.adjacentFaces) {
+            if (probableFaces[faceIdx].status == FaceStatus::TRUE_FACE) {
+                trueFaceCount++;
+            }
+        }
+        if (edge.status == EdgeStatus::TRUE_EDGE && trueFaceCount != 2) {
+            return false;
+        }
+    }
+
+    // Verify that no two faces intersect except on their edges
+    // Implement this check according to your requirements
+    // For now, we can assume it's true if we have no data about face intersections
+
+    return true;
 }

@@ -37,11 +37,15 @@ int main() {
     // Generate probable faces
     wireframe.generateProbableFaces();
 
+    // Remove pseudo elements
+    wireframe.removePseudoElements();
+
     // Write wireframe model to output file
     wireframe.writeToFile("output.txt");
 
     // Optionally, print the wireframe model
     wireframe.print();
+
 
     return 0;
 }

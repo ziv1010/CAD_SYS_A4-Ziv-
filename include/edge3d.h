@@ -2,7 +2,8 @@
 #define EDGE3D_H
 
 #include <cstdio>
-
+#include <vector>   // Add this line
+#include <string> 
 
 enum class EdgeStatus {
     UNDECIDED,
@@ -26,6 +27,7 @@ public:
                (startIdx == other.endIdx && endIdx == other.startIdx);
     }
 
+    // In edge3d.h
     std::string statusToString() const {
         switch (status) {
             case EdgeStatus::UNDECIDED: return "UNDECIDED";
@@ -34,6 +36,7 @@ public:
             default: return "UNKNOWN";
         }
     }
+
 
     // Debug print
     void print() const {

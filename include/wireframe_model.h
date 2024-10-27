@@ -14,22 +14,13 @@ public:
     std::vector<Edge3D> probableEdges;
     std::vector<Face3D> probableFaces;
 
-    // Method to generate probable 3D vertices
+    // Public methods
     void generateProbableVertices(const Graph2D& topView, const Graph2D& frontView, const Graph2D& sideView);
-
-    // Method to generate probable 3D edges
     void generateProbableEdges(const Graph2D& topView, const Graph2D& frontView, const Graph2D& sideView);
-
-    // Method to validate p-vertices and p-edges
     void validateVerticesAndEdges();
-
-    // Method to generate probable faces
     void generateProbableFaces();
-
-    // Method to write probable vertices and edges to output file
+    void removePseudoElements();
     void writeToFile(const std::string& filename) const;
-
-    // Debug print
     void print() const;
 
 private:
@@ -40,8 +31,17 @@ private:
     float computeInternalAngle(const Vertex3D& v, const Vertex3D& v1, const Vertex3D& v2) const;
     Vertex3D edgeVector(int startIdx, int endIdx) const;
     Vertex3D crossProduct(const Vertex3D& a, const Vertex3D& b) const;
+    bool areFacesCoplanar(const Face3D& face1, const Face3D& face2);
+    void mergeFaces(Face3D& face1, Face3D& face2);
+    bool applyDecisionRules();
+    bool decisionChaining();
+    bool verifyMoebiusRule();
+
+    // Rule functions (declare them as member functions)
+    bool applyRule1(Edge3D& edge, std::vector<Face3D>& faces);
+    bool applyRule4(Edge3D& edge, std::vector<Face3D>& faces);
+    bool applyRule5(Edge3D& edge, std::vector<Face3D>& faces);
+    bool applyRule6(Edge3D& edge, std::vector<Face3D>& faces);
 };
 
 #endif // WIREFRAME_MODEL_H
-
-
