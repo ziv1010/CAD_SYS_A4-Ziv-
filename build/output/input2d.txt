@@ -1,0 +1,35 @@
+Top_View
+4
+0 0
+1 0
+1 1
+0 1
+4
+0 1 solid
+1 2 solid
+2 3 solid
+3 0 solid
+
+Front_View
+4
+0 0
+1 0
+1 1
+0 1
+4
+0 1 solid
+1 2 solid
+2 3 solid
+3 0 solid
+
+Side_View
+4
+0 0
+1 0
+1 1
+0 1
+4
+0 1 solid
+1 2 solid
+2 3 solid
+3 0 solid

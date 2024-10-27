@@ -1,38 +1,35 @@
-// main.cpp
-
-#include "object3d.h"
-#include "orthographic_projections.h"
-#include "file_io.h"
+#include "graph2d.h"
+#include "graph2d_utils.h"
+#include "wireframe_model.h"
 #include <iostream>
-#include "transformations.h"
 
 int main() {
-    Object3D object;
+    Graph2D topView("Top");
+    Graph2D frontView("Front");
+    Graph2D sideView("Side");
 
-    // Read the 3D object from the input file
-    read3DObjectFromFile("build/output/input3D.txt", object);
-    // Project the 3D object onto 2D planes
-    Projection2D topView, frontView, sideView;
-    projectToTopView(object, topView);     // Top view (XY plane)
-    projectToFrontView(object, frontView); // Front view (XZ plane)
-    projectToSideView(object, sideView);   // Side view (YZ plane)
+    // Read input file
+    readGraphsFromFile("build/output/input2d.txt", topView, frontView, sideView);
 
-    // Classify edges as visible or hidden
-    classifyEdges(object, topView, object.faces, "XY");
-    classifyEdges(object, frontView, object.faces, "XZ");
-    classifyEdges(object, sideView, object.faces, "YZ");
+    // Process each view
+    topView.removeDuplicateVertices();
+    topView.processIntersections();
+    topView.handleCollinearLines();
 
-    // Save the 2D projections as one combined PNG file
-    saveCombinedProjectionAsImage("build/output/combined_views.png", topView, frontView, sideView);
+    frontView.removeDuplicateVertices();
+    frontView.processIntersections();
+    frontView.handleCollinearLines();
 
-    std::cout << "Projections with hidden lines saved to combined image." << std::endl;
+    sideView.removeDuplicateVertices();
+    sideView.processIntersections();
+    sideView.handleCollinearLines();
 
-        // Compute surface area and volume
-    float surfaceArea = object.computeSurfaceArea();
-    float volume = object.computeVolume();
+    // Generate probable 3D vertices
+    WireframeModel wireframe;
+    wireframe.generateProbableVertices(topView, frontView, sideView);
 
-    std::cout << "Surface Area: " << surfaceArea << std::endl;
-    std::cout << "Volume: " << volume << std::endl;
+    // Write probable 3D vertices to output file
+    wireframe.writeVerticesToFile("output.txt");
 
     return 0;
 }
