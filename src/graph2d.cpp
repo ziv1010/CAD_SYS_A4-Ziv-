@@ -128,9 +128,87 @@ void Graph2D::processIntersections() {
 }
 
 void Graph2D::handleCollinearLines() {
-    // For simplicity, this implementation does not merge collinear lines
-    // Implementing collinear line merging is beyond the scope of this example
-    std::cout << "[Debug][" << viewName << "] Collinear line handling not implemented." << std::endl;
+    std::cout << "[Debug][" << viewName << "] Handling collinear lines..." << std::endl;
+    
+    // Map from vertex index to list of connected edges
+    std::unordered_map<int, std::vector<int>> vertexToEdges;
+    for (size_t i = 0; i < edges.size(); ++i) {
+        const auto& edge = edges[i];
+        vertexToEdges[edge.startIdx].push_back(i);
+        vertexToEdges[edge.endIdx].push_back(i);
+    }
+
+    // Keep track of edges that need to be removed
+    std::set<int> edgesToRemove;
+
+    // New edges to be added
+    std::vector<Line2D> newEdges;
+
+    // For each vertex
+    for (const auto& [vertexIdx, edgeIndices] : vertexToEdges) {
+        if (edgeIndices.size() < 2) continue; // Need at least two edges to check collinearity
+
+        // For each pair of edges connected to this vertex
+        for (size_t i = 0; i < edgeIndices.size(); ++i) {
+            for (size_t j = i + 1; j < edgeIndices.size(); ++j) {
+                int edgeIdx1 = edgeIndices[i];
+                int edgeIdx2 = edgeIndices[j];
+
+                // Skip if either edge is already marked for removal
+                if (edgesToRemove.count(edgeIdx1) || edgesToRemove.count(edgeIdx2))
+                    continue;
+
+                const Line2D& edge1 = edges[edgeIdx1];
+                const Line2D& edge2 = edges[edgeIdx2];
+
+                // Get the other vertices of the edges (not the common vertex)
+                int otherVertexIdx1 = (edge1.startIdx == vertexIdx) ? edge1.endIdx : edge1.startIdx;
+                int otherVertexIdx2 = (edge2.startIdx == vertexIdx) ? edge2.endIdx : edge2.startIdx;
+
+                const Point2D& v1 = vertices[otherVertexIdx1];
+                const Point2D& v2 = vertices[vertexIdx];
+                const Point2D& v3 = vertices[otherVertexIdx2];
+
+                // Check if the three points are collinear
+                // Compute (x3 - x2)/(x2 - x1) and (y3 - y2)/(y2 - y1)
+                float x21 = v2.x - v1.x;
+                float y21 = v2.y - v1.y;
+                float x32 = v3.x - v2.x;
+                float y32 = v3.y - v2.y;
+
+                float crossProduct = x21 * y32 - y21 * x32;
+
+                if (std::fabs(crossProduct) < EPSILON) {
+                    // The three points are collinear
+                    // Merge the two edges into one edge between otherVertexIdx1 and otherVertexIdx2
+
+                    Line2D newEdge(otherVertexIdx1, otherVertexIdx2, edge1.type);
+                    newEdges.push_back(newEdge);
+
+                    // Mark the original edges for removal
+                    edgesToRemove.insert(edgeIdx1);
+                    edgesToRemove.insert(edgeIdx2);
+
+                    std::cout << "[Debug][" << viewName << "] Merging collinear edges at vertex " << vertexIdx << std::endl;
+                }
+            }
+        }
+    }
+
+    // Remove the old edges
+    std::vector<Line2D> updatedEdges;
+    for (size_t i = 0; i < edges.size(); ++i) {
+        if (edgesToRemove.count(i) == 0) {
+            updatedEdges.push_back(edges[i]);
+        }
+    }
+
+    // Add the new edges
+    updatedEdges.insert(updatedEdges.end(), newEdges.begin(), newEdges.end());
+
+    edges = updatedEdges;
+
+    std::cout << "[Debug][" << viewName << "] Collinear lines handled. Total edges: " << edges.size() << std::endl;
 }
 
 void Graph2D::print() const {

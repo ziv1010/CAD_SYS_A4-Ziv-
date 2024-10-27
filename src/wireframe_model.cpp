@@ -6,7 +6,7 @@
 #include <fstream>
 #include <map>
 #include <set>
-
+#define EPSILON 1e-6
 
 void WireframeModel::generateProbableVertices(const Graph2D& topView, const Graph2D& frontView, const Graph2D& sideView) {
     // Maps to find matching coordinates
@@ -119,19 +119,34 @@ void WireframeModel::generateProbableEdges(const Graph2D& topView, const Graph2D
 
             // Decide if the edge should be added
             int lineCount = edgeInTopView + edgeInFrontView + edgeInSideView;
-            if (lineCount >= 2) {
-                // Edge appears in at least two views
-                Edge3D edge(i, j);
-                // Check for redundancy
-                auto it = std::find(probableEdges.begin(), probableEdges.end(), edge);
-                if (it == probableEdges.end()) {
-                    probableEdges.push_back(edge);
-                    std::cout << "[Debug] Added Edge3D from Vertex " << i << " to Vertex " << j << std::endl;
+
+            bool coincideInThirdView = false;
+            if (lineCount == 2) {
+                // Check if projections coincide in the third view
+                if (!edgeInTopView) {
+                    coincideInThirdView = (p1_top == p2_top);
+                } else if (!edgeInFrontView) {
+                    coincideInThirdView = (p1_front == p2_front);
+                } else if (!edgeInSideView) {
+                    coincideInThirdView = (p1_side == p2_side);
                 }
+            }
+
+            // Only add edge if conditions are met
+            if (lineCount == 3 || (lineCount == 2 && coincideInThirdView)) {
+                // Before adding the edge, check for containment (existing logic)
+                // ... existing edge containment code ...
+
+                // Add new edge if not contained
+                probableEdges.push_back(Edge3D(i, j));
+                std::cout << "[Debug] Added Edge3D from Vertex " << i << " to Vertex " << j << std::endl;
+            } else {
+                std::cout << "[Debug] Edge between Vertex " << i << " and Vertex " << j << " not added. Conditions not met." << std::endl;
             }
         }
     }
 }
+
 
 void WireframeModel::validateVerticesAndEdges() {
     std::cout << "[Debug] Validating vertices and edges..." << std::endl;
@@ -225,4 +240,41 @@ void WireframeModel::print() const {
     for (const auto& edge : probableEdges) {
         edge.print();
     }
+}
+
+bool WireframeModel::isPointOnLineSegment(const Vertex3D& p, const Vertex3D& a, const Vertex3D& b) const {
+    // Check if point p lies on line segment ab
+    // First, check if p lies on the line defined by a and b
+    Vertex3D ap(p.x - a.x, p.y - a.y, p.z - a.z);
+    Vertex3D ab(b.x - a.x, b.y - a.y, b.z - a.z);
+    float cross_x = ap.y * ab.z - ap.z * ab.y;
+    float cross_y = ap.z * ab.x - ap.x * ab.z;
+    float cross_z = ap.x * ab.y - ap.y * ab.x;
+    float cross_norm = sqrt(cross_x * cross_x + cross_y * cross_y + cross_z * cross_z);
+
+    if (cross_norm > EPSILON) {
+        // Not colinear
+        return false;
+    }
+
+    // Check if p is between a and b
+    float dotProduct = (p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y) + (p.z - a.z) * (b.z - a.z);
+    if (dotProduct < 0)
+        return false;
+
+    float squaredLengthAB = (b.x - a.x)*(b.x - a.x) + (b.y - a.y)*(b.y - a.y) + (b.z - a.z)*(b.z - a.z);
+    if (dotProduct > squaredLengthAB)
+        return false;
+
+    return true;
+}
+
+bool WireframeModel::isEdgeContained(const Edge3D& e1, const Edge3D& e2) const {
+    // Check if edge e2 is contained within edge e1
+    const Vertex3D& a = probableVertices[e1.startIdx];
+    const Vertex3D& b = probableVertices[e1.endIdx];
+    const Vertex3D& c = probableVertices[e2.startIdx];
+    const Vertex3D& d = probableVertices[e2.endIdx];
+
+    return isPointOnLineSegment(c, a, b) && isPointOnLineSegment(d, a, b);
 }

@@ -26,6 +26,12 @@ public:
 
     // Debug print
     void print() const;
+
+private:
+    // Helper functions
+    bool isPointOnLineSegment(const Vertex3D& p, const Vertex3D& a, const Vertex3D& b) const;
+    bool isEdgeContained(const Edge3D& e1, const Edge3D& e2) const;
+
 };
 
 #endif // WIREFRAME_MODEL_H
