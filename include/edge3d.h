@@ -3,19 +3,36 @@
 
 #include <cstdio>
 
+
+enum class EdgeStatus {
+    UNDECIDED,
+    TRUE_EDGE,
+    FALSE_EDGE
+};
+
 class Edge3D {
 public:
     int startIdx;
     int endIdx;
 
-    // Constructors
-    Edge3D() : startIdx(0), endIdx(0) {}
-    Edge3D(int s, int e) : startIdx(s), endIdx(e) {}
+    EdgeStatus status;
+    std::vector<int> adjacentFaces; // Indices of faces adjacent to this edge
+
+    Edge3D(int start, int end) : startIdx(start), endIdx(end), status(EdgeStatus::UNDECIDED) {}
 
     // Overloaded operators
     bool operator==(const Edge3D& other) const {
         return (startIdx == other.startIdx && endIdx == other.endIdx) ||
                (startIdx == other.endIdx && endIdx == other.startIdx);
+    }
+
+    std::string statusToString() const {
+        switch (status) {
+            case EdgeStatus::UNDECIDED: return "UNDECIDED";
+            case EdgeStatus::TRUE_EDGE: return "TRUE";
+            case EdgeStatus::FALSE_EDGE: return "FALSE";
+            default: return "UNKNOWN";
+        }
     }
 
     // Debug print

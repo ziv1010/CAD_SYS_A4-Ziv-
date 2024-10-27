@@ -225,6 +225,15 @@ void WireframeModel::writeToFile(const std::string& filename) const {
         outfile << edge.startIdx << " " << edge.endIdx << std::endl;
     }
 
+    outfile << "Faces:" << std::endl;
+    for (const auto& face : probableFaces) {
+        outfile << "Face with vertices:";
+        for (int idx : face.vertexIndices) {
+            outfile << " " << idx;
+        }
+        outfile << std::endl;
+    }
+
     outfile.close();
     std::cout << "[Debug] Wireframe model written to " << filename << std::endl;
 }
@@ -240,7 +249,13 @@ void WireframeModel::print() const {
     for (const auto& edge : probableEdges) {
         edge.print();
     }
+
+    std::cout << "Probable 3D Faces:" << std::endl;
+    for (const auto& face : probableFaces) {
+        face.print();
+    }
 }
+
 
 bool WireframeModel::isPointOnLineSegment(const Vertex3D& p, const Vertex3D& a, const Vertex3D& b) const {
     // Check if point p lies on line segment ab
@@ -277,4 +292,216 @@ bool WireframeModel::isEdgeContained(const Edge3D& e1, const Edge3D& e2) const {
     const Vertex3D& d = probableVertices[e2.endIdx];
 
     return isPointOnLineSegment(c, a, b) && isPointOnLineSegment(d, a, b);
+}
+
+// Helper method to get edges adjacent to a vertex
+std::vector<int> WireframeModel::getAdjacentEdges(int vertexIdx) const {
+    std::vector<int> adjacentEdges;
+    for (size_t i = 0; i < probableEdges.size(); ++i) {
+        const Edge3D& edge = probableEdges[i];
+        if (edge.startIdx == vertexIdx || edge.endIdx == vertexIdx) {
+            adjacentEdges.push_back(i);
+        }
+    }
+    return adjacentEdges;
+}
+
+// Helper method to compute internal angle between two edges at a vertex
+float WireframeModel::computeInternalAngle(const Vertex3D& v, const Vertex3D& v1, const Vertex3D& v2) const {
+    // Vectors from v to v1 and v to v2
+    Vertex3D vec1(v1.x - v.x, v1.y - v.y, v1.z - v.z);
+    Vertex3D vec2(v2.x - v.x, v2.y - v.y, v2.z - v.z);
+
+    // Compute dot product and magnitudes
+    float dotProd = vec1.x * vec2.x + vec1.y * vec2.y + vec1.z * vec2.z;
+    float mag1 = sqrt(vec1.x * vec1.x + vec1.y * vec1.y + vec1.z * vec1.z);
+    float mag2 = sqrt(vec2.x * vec2.x + vec2.y * vec2.y + vec2.z * vec2.z);
+
+    if (mag1 < EPSILON || mag2 < EPSILON)
+        return 0.0f;
+
+    float cosTheta = dotProd / (mag1 * mag2);
+
+    // Clamp cosTheta to [-1,1] to avoid numerical issues
+    cosTheta = std::max(-1.0f, std::min(1.0f, cosTheta));
+
+    // Return the angle in radians
+    return acos(cosTheta);
+}
+
+// Helper method to get vector representation of an edge
+Vertex3D WireframeModel::edgeVector(int startIdx, int endIdx) const {
+    const Vertex3D& startVertex = probableVertices[startIdx];
+    const Vertex3D& endVertex = probableVertices[endIdx];
+    return Vertex3D(endVertex.x - startVertex.x, endVertex.y - startVertex.y, endVertex.z - startVertex.z);
+}
+
+// Helper method to compute cross product of two vectors
+Vertex3D WireframeModel::crossProduct(const Vertex3D& a, const Vertex3D& b) const {
+    return Vertex3D(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    );
+}
+
+void WireframeModel::generateProbableFaces() {
+    std::cout << "[Debug] Generating probable faces..." << std::endl;
+
+    // Set to store unique faces (represented by sorted list of vertex indices)
+    std::set<std::vector<int>> uniqueFaces;
+
+    // Build adjacency list for edges
+    std::map<int, std::vector<int>> vertexToEdges;
+    for (size_t i = 0; i < probableEdges.size(); ++i) {
+        const Edge3D& edge = probableEdges[i];
+        vertexToEdges[edge.startIdx].push_back(i);
+        vertexToEdges[edge.endIdx].push_back(i);
+    }
+
+    // For each vertex
+    for (size_t vi = 0; vi < probableVertices.size(); ++vi) {
+        int v_i = vi;
+        const Vertex3D& vertex_i = probableVertices[v_i];
+
+        // Get adjacent edges
+        std::vector<int> adjacentEdges = vertexToEdges[v_i];
+
+        // For each pair of adjacent edges at vertex v_i
+        for (size_t e1_idx = 0; e1_idx < adjacentEdges.size(); ++e1_idx) {
+            for (size_t e2_idx = e1_idx + 1; e2_idx < adjacentEdges.size(); ++e2_idx) {
+                int edgeIdx1 = adjacentEdges[e1_idx];
+                int edgeIdx2 = adjacentEdges[e2_idx];
+
+                // Initialize face trace
+                std::vector<int> faceVertices;
+                faceVertices.push_back(v_i);
+
+                int currentVertex = v_i;
+                int previousEdgeIdx = edgeIdx1;
+                int currentEdgeIdx = edgeIdx2;
+
+                std::vector<int> faceEdges;
+                faceEdges.push_back(previousEdgeIdx);
+                faceEdges.push_back(currentEdgeIdx);
+
+                std::vector<Vertex3D> normals;
+
+                bool faceCompleted = false;
+                std::set<std::pair<int, int>> visitedEdges;
+                visitedEdges.insert({previousEdgeIdx, currentEdgeIdx});
+
+                while (true) {
+                    // Get the other vertex of currentEdge
+                    const Edge3D& currentEdge = probableEdges[currentEdgeIdx];
+                    int nextVertex = (currentEdge.startIdx == currentVertex) ? currentEdge.endIdx : currentEdge.startIdx;
+
+                    if (nextVertex == v_i) {
+                        // Face completed
+                        faceCompleted = true;
+                        break;
+                    }
+
+                    faceVertices.push_back(nextVertex);
+
+                    // Get adjacent edges of nextVertex, excluding currentEdge
+                    std::vector<int> nextAdjacentEdges = vertexToEdges[nextVertex];
+                    // Remove currentEdge
+                    nextAdjacentEdges.erase(std::remove(nextAdjacentEdges.begin(), nextAdjacentEdges.end(), currentEdgeIdx), nextAdjacentEdges.end());
+
+                    if (nextAdjacentEdges.empty()) {
+                        // No further edges, cannot continue
+                        break;
+                    }
+
+                    // Compute internal angles between currentEdge and each adjacent edge
+                    int selectedEdgeIdx = -1;
+                    float minAngle = std::numeric_limits<float>::max();
+
+                    const Vertex3D& currentVertexPos = probableVertices[currentVertex];
+                    const Vertex3D& nextVertexPos = probableVertices[nextVertex];
+
+                    Vertex3D vec1 = edgeVector(currentVertex, nextVertex);
+
+                    for (int adjEdgeIdx : nextAdjacentEdges) {
+                        const Edge3D& adjEdge = probableEdges[adjEdgeIdx];
+
+                        int otherVertex = (adjEdge.startIdx == nextVertex) ? adjEdge.endIdx : adjEdge.startIdx;
+                        const Vertex3D& otherVertexPos = probableVertices[otherVertex];
+
+                        Vertex3D vec2 = edgeVector(nextVertex, otherVertex);
+
+                        // Compute internal angle
+                        float angle = computeInternalAngle(nextVertexPos, currentVertexPos, otherVertexPos);
+
+                        // Planarity check using cross products
+                        Vertex3D normal1 = crossProduct(vec1, vec2);
+                        if (normals.empty()) {
+                            normals.push_back(normal1);
+                        } else {
+                            // Compare with initial normal
+                            Vertex3D& normal0 = normals[0];
+                            float dotProduct = normal0.x * normal1.x + normal0.y * normal1.y + normal0.z * normal1.z;
+                            float mag0 = sqrt(normal0.x * normal0.x + normal0.y * normal0.y + normal0.z * normal0.z);
+                            float mag1 = sqrt(normal1.x * normal1.x + normal1.y * normal1.y + normal1.z * normal1.z);
+
+                            if (mag0 < EPSILON || mag1 < EPSILON) {
+                                continue; // Degenerate normal
+                            }
+
+                            float cosTheta = dotProduct / (mag0 * mag1);
+                            cosTheta = std::max(-1.0f, std::min(1.0f, cosTheta));
+
+                            if (fabs(cosTheta - 1.0f) > EPSILON) {
+                                continue; // Not planar
+                            }
+                        }
+
+                        if (angle < minAngle) {
+                            minAngle = angle;
+                            selectedEdgeIdx = adjEdgeIdx;
+                        }
+                    }
+
+                    if (selectedEdgeIdx == -1) {
+                        // No suitable edge found
+                        break;
+                    }
+
+                    // Avoid cycles
+                    std::pair<int, int> edgePair = {currentEdgeIdx, selectedEdgeIdx};
+                    if (visitedEdges.count(edgePair)) {
+                        break;
+                    }
+                    visitedEdges.insert(edgePair);
+
+                    // Update for next iteration
+                    faceEdges.push_back(selectedEdgeIdx);
+                    previousEdgeIdx = currentEdgeIdx;
+                    currentEdgeIdx = selectedEdgeIdx;
+                    currentVertex = nextVertex;
+                    vec1 = edgeVector(currentVertex, probableEdges[currentEdgeIdx].startIdx == currentVertex ? probableEdges[currentEdgeIdx].endIdx : probableEdges[currentEdgeIdx].startIdx);
+                }
+
+                if (faceCompleted) {
+                    // Create face
+                    // Sort vertex indices to avoid duplicates
+                    std::vector<int> faceVertexIndices = faceVertices;
+                    std::sort(faceVertexIndices.begin(), faceVertexIndices.end());
+
+                    if (uniqueFaces.find(faceVertexIndices) == uniqueFaces.end()) {
+                        uniqueFaces.insert(faceVertexIndices);
+                        probableFaces.push_back(Face3D(faceVertices));
+                        std::cout << "[Debug] Found probable face with vertices:";
+                        for (int idx : faceVertices) {
+                            std::cout << " " << idx;
+                        }
+                        std::cout << std::endl;
+                    }
+                }
+            }
+        }
+    }
+
+    std::cout << "[Debug] Total probable faces found: " << probableFaces.size() << std::endl;
 }

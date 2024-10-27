@@ -34,6 +34,9 @@ int main() {
     // Validate vertices and edges
     wireframe.validateVerticesAndEdges();
 
+    // Generate probable faces
+    wireframe.generateProbableFaces();
+
     // Write wireframe model to output file
     wireframe.writeToFile("output.txt");
 

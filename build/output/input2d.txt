@@ -1,44 +1,35 @@
 Top_View
-6
+4
 0 0
 1 0
 1 1
 0 1
-0.5 0
-0.5 1
-5
+4
 0 1 solid
 1 2 solid
 2 3 solid
 3 0 solid
-4 5 solid
 
 Front_View
-6
+4
 0 0
 1 0
 1 1
 0 1
-0.5 0
-0.5 1
-5
+4
 0 1 solid
 1 2 solid
 2 3 solid
 3 0 solid
-4 5 solid
 
 Side_View
-6
+4
 0 0
 1 0
 1 1
 0 1
-0 0.5
-1 0.5
-5
+4
 0 1 solid
 1 2 solid
 2 3 solid
 3 0 solid
-4 5 solid
