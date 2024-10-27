@@ -1,51 +1,60 @@
-#include "graph2d.h"
-#include "graph2d_utils.h"
-#include "wireframe_model.h"
+#include "object3d.h"
+#include "orthographic_projections.h"
+#include "file_io.h"
 #include <iostream>
+#include "transformations.h"
 
 int main() {
-    Graph2D topView("Top");
-    Graph2D frontView("Front");
-    Graph2D sideView("Side");
+    Object3D object;
 
-    // Read input file
-    readGraphsFromFile("build/output/input2d.txt", topView, frontView, sideView);
+    // Read the 3D object from the input file
+    read3DObjectFromFile("build/output/input3D.txt", object);
 
-    // Process each view
-    topView.removeDuplicateVertices();
-    topView.processIntersections();
-    topView.handleCollinearLines();
+    // Project the 3D object onto 2D planes
+    Projection2D topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden;
+    projectToTopView(object, topViewWithoutHidden);     // Top view (XY plane)
+    projectToFrontView(object, frontViewWithoutHidden); // Front view (XZ plane)
+    projectToSideView(object, sideViewWithoutHidden);   // Side view (YZ plane)
 
-    frontView.removeDuplicateVertices();
-    frontView.processIntersections();
-    frontView.handleCollinearLines();
+    // **First, save projections without hidden line processing**
+    // For projections without hidden lines, all edges are considered visible
+    topViewWithoutHidden.visibleEdges = object.edges;
+    frontViewWithoutHidden.visibleEdges = object.edges;
+    sideViewWithoutHidden.visibleEdges = object.edges;
 
-    sideView.removeDuplicateVertices();
-    sideView.processIntersections();
-    sideView.handleCollinearLines();
+    // Save the projections without hidden lines
+    saveCombinedProjectionAsImage("build/output/combined_views_without_hidden_lines.png",
+                                  topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden);
 
-    // Generate probable 3D vertices
-    WireframeModel wireframe;
-    wireframe.generateProbableVertices(topView, frontView, sideView);
+    saveProjectionsToTextFile("build/output/projections_without_hidden_lines.txt",
+                              topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden);
 
-    // Generate probable 3D edges
-    wireframe.generateProbableEdges(topView, frontView, sideView);
+    std::cout << "Projections without hidden lines saved." << std::endl;
 
-    // Validate vertices and edges
-    wireframe.validateVerticesAndEdges();
+    // Now, classify edges as visible or hidden
+    Projection2D topViewWithHidden = topViewWithoutHidden;
+    Projection2D frontViewWithHidden = frontViewWithoutHidden;
+    Projection2D sideViewWithHidden = sideViewWithoutHidden;
 
-    // Generate probable faces
-    wireframe.generateProbableFaces();
+    classifyEdges(object, topViewWithHidden, object.faces, "XY");
+    classifyEdges(object, frontViewWithHidden, object.faces, "XZ");
+    classifyEdges(object, sideViewWithHidden, object.faces, "YZ");
 
-    // Remove pseudo elements
-    wireframe.removePseudoElements();
+    // Save the projections with hidden lines
+    saveCombinedProjectionAsImage("build/output/combined_views_with_hidden_lines.png",
+                                  topViewWithHidden, frontViewWithHidden, sideViewWithHidden);
 
-    // Write wireframe model to output file
-    wireframe.writeToFile("output.txt");
+    saveProjectionsToTextFile("build/output/projections_with_hidden_lines.txt",
+                              topViewWithHidden, frontViewWithHidden, sideViewWithHidden);
 
-    // Optionally, print the wireframe model
-    wireframe.print();
+    std::cout << "Projections with hidden lines saved." << std::endl;
 
+    // Compute surface area and volume
+    float surfaceArea = object.computeSurfaceArea();
+    float volume = object.computeVolume();
+
+    std::cout << "Surface Area: " << surfaceArea << std::endl;
+    std::cout << "Volume: " << volume << std::endl;
 
     return 0;
 }

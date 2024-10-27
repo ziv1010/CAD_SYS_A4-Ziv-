@@ -56,26 +56,28 @@ void saveProjectionsToTextFile(const std::string& filename,
         return;
     }
 
-    // Example format:
-    // For each projection (Top, Front, Side):
-    // Number of visible edges
-    // List of visible edges
-    // Number of hidden edges
-    // List of hidden edges
-
     auto saveProjection = [&](const Projection2D& projection, const std::string& viewName) {
         outfile << viewName << " View" << std::endl;
 
-        // Visible Edges
-        outfile << "Visible Edges: " << projection.visibleEdges.size() << std::endl;
-        for (const auto& edge : projection.visibleEdges) {
-            outfile << edge.v1_index << " " << edge.v2_index << std::endl;
-        }
+        if (projection.hiddenEdges.empty() && projection.visibleEdges.empty()) {
+            // All edges are visible
+            outfile << "Visible Edges: " << projection.projectedEdges.size() << std::endl;
+            for (const auto& edge : projection.projectedEdges) {
+                outfile << edge.first << " " << edge.second << std::endl;
+            }
+            outfile << "Hidden Edges: 0" << std::endl;
+        } else {
+            // Visible Edges
+            outfile << "Visible Edges: " << projection.visibleEdges.size() << std::endl;
+            for (const auto& edge : projection.visibleEdges) {
+                outfile << edge.v1_index << " " << edge.v2_index << std::endl;
+            }
 
-        // Hidden Edges
-        outfile << "Hidden Edges: " << projection.hiddenEdges.size() << std::endl;
-        for (const auto& edge : projection.hiddenEdges) {
-            outfile << edge.v1_index << " " << edge.v2_index << std::endl;
+            // Hidden Edges
+            outfile << "Hidden Edges: " << projection.hiddenEdges.size() << std::endl;
+            for (const auto& edge : projection.hiddenEdges) {
+                outfile << edge.v1_index << " " << edge.v2_index << std::endl;
+            }
         }
 
         outfile << std::endl;
@@ -87,6 +89,8 @@ void saveProjectionsToTextFile(const std::string& filename,
 
     outfile.close();
 }
+
+
 
 // Function to draw a line with optional dashed pattern
 void drawLine(std::vector<unsigned char>& image, int canvasWidth, int canvasHeight,
@@ -194,28 +198,43 @@ void saveCombinedProjectionAsImage(const std::string& filename,
             }
         }
 
-        // Draw visible edges as solid lines
-        for (const auto& edge : projection.visibleEdges) {
-            int v1 = edge.v1_index;
-            int v2 = edge.v2_index;
-            int x0 = imageCoords[v1].first;
-            int y0 = imageCoords[v1].second;
-            int x1 = imageCoords[v2].first;
-            int y1 = imageCoords[v2].second;
+        // Now, draw edges
+        if (projection.hiddenEdges.empty() && projection.visibleEdges.empty()) {
+            // All edges are visible (no hidden line processing)
+            for (const auto& edge : projection.projectedEdges) {
+                int v1 = edge.first;
+                int v2 = edge.second;
+                int x0 = imageCoords[v1].first;
+                int y0 = imageCoords[v1].second;
+                int x1 = imageCoords[v2].first;
+                int y1 = imageCoords[v2].second;
 
-            drawLine(image, canvasWidth, canvasHeight, x0, y0, x1, y1, false);
-        }
+                drawLine(image, canvasWidth, canvasHeight, x0, y0, x1, y1, false);
+            }
+        } else {
+            // Draw visible edges as solid lines
+            for (const auto& edge : projection.visibleEdges) {
+                int v1 = edge.v1_index;
+                int v2 = edge.v2_index;
+                int x0 = imageCoords[v1].first;
+                int y0 = imageCoords[v1].second;
+                int x1 = imageCoords[v2].first;
+                int y1 = imageCoords[v2].second;
 
-        // Draw hidden edges as dashed lines
-        for (const auto& edge : projection.hiddenEdges) {
-            int v1 = edge.v1_index;
-            int v2 = edge.v2_index;
-            int x0 = imageCoords[v1].first;
-            int y0 = imageCoords[v1].second;
-            int x1 = imageCoords[v2].first;
-            int y1 = imageCoords[v2].second;
+                drawLine(image, canvasWidth, canvasHeight, x0, y0, x1, y1, false);
+            }
 
-            drawLine(image, canvasWidth, canvasHeight, x0, y0, x1, y1, true);
+            // Draw hidden edges as dashed lines
+            for (const auto& edge : projection.hiddenEdges) {
+                int v1 = edge.v1_index;
+                int v2 = edge.v2_index;
+                int x0 = imageCoords[v1].first;
+                int y0 = imageCoords[v1].second;
+                int x1 = imageCoords[v2].first;
+                int y1 = imageCoords[v2].second;
+
+                drawLine(image, canvasWidth, canvasHeight, x0, y0, x1, y1, true);
+            }
         }
     };
 
@@ -236,14 +255,6 @@ void saveCombinedProjectionAsImage(const std::string& filename,
     }
 }
 
-// Helper function to compute the midpoint of an edge in 2D
-Point2D computeMidpoint2D(const Projection2D& projection, const Edge& edge) {
-    float x0 = projection.projectedVertices[edge.v1_index].first;
-    float y0 = projection.projectedVertices[edge.v1_index].second;
-    float x1 = projection.projectedVertices[edge.v2_index].first;
-    float y1 = projection.projectedVertices[edge.v2_index].second;
-    return Point2D{(x0 + x1) / 2.0f, (y0 + y1) / 2.0f};
-}
 
 // Helper function to compute the 3D midpoint corresponding to a 2D point
 Vertex compute3DMidpoint(const Object3D& object, const Edge& edge, const Point2D& midpoint2D, const std::string& plane) {

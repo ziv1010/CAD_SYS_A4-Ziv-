@@ -9,11 +9,15 @@
 
 struct Projection2D {
     std::vector<std::pair<float, float>> projectedVertices;
-    std::vector<std::pair<int, int>> projectedEdges; // indices into projectedVertices
+    std::vector<std::pair<int, int>> projectedEdges; // Indices into projectedVertices
 
     // Members for hidden line detection
     std::vector<Edge> visibleEdges;
     std::vector<Edge> hiddenEdges;
+
+    // Constructor to initialize vectors
+    Projection2D() : projectedVertices(), projectedEdges(), visibleEdges(), hiddenEdges() {}
 };
+
 
 #endif // PROJECTION2D_H
