@@ -13,8 +13,9 @@ int main() {
     // Read the 3D object from the input file
     read3DObjectFromFile("build/output/input3D.txt", object);
 
-    Transformations::rotateX(object, 90.0f);
-    Transformations::scale(object, 2.0f);
+    Transformations::rotateX(object, 0.0f);
+    Transformations::scale(object, 1.0f);
+    Transformations::translate(object, 3.0f, 3.0f, 3.0f);
     // Ask the user for slicing plane parameters
     char axis;
     float position;

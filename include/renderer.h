@@ -54,7 +54,7 @@ private:
     // Input handling
     void handleSlicingInput();
 
-     // Renderable objects
+    // Renderable objects
     struct RenderObject {
         Object3D object;
         glm::vec3 color;
@@ -66,6 +66,9 @@ private:
     };
 
     std::vector<RenderObject> renderObjects;
+
+    // **New function declarations**
+    void drawAxes();
 };
 
 #endif // RENDERER_H

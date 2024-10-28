@@ -1,3 +1,5 @@
+// renderer.cpp
+
 #include "renderer.h"
 #include <iostream>
 #include <vector>
@@ -9,11 +11,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Shader sources
 const char* vertexShaderSource = R"(
 // Vertex Shader
 #version 330 core
 layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aColor; // New: Color attribute
+
+out vec3 vertexColor; // New: Pass color to fragment shader
 
 uniform mat4 model;
 uniform mat4 view;
@@ -21,6 +25,7 @@ uniform mat4 projection;
 
 void main()
 {
+    vertexColor = aColor; // Pass color to fragment shader
     gl_Position = projection * view * model * vec4(aPos, 1.0);
 }
 )";
@@ -28,19 +33,18 @@ void main()
 const char* fragmentShaderSource = R"(
 // Fragment Shader
 #version 330 core
+in vec3 vertexColor; // Receive color from vertex shader
 out vec4 FragColor;
-
-uniform vec3 objectColor;
 
 void main()
 {
-    FragColor = vec4(objectColor, 1.0);
+    FragColor = vec4(vertexColor, 1.0);
 }
 )";
 
 Renderer::Renderer()
     : window(nullptr), shaderProgram(0),
-      cameraZoom(45.0f), rotationAngle(0.0f),
+      cameraZoom(60.0f), rotationAngle(0.0f),
       slicingAxis('X'), slicingPosition(0.0f)
 {
 }
@@ -111,8 +115,8 @@ bool Renderer::initialize()
         renderer->cameraZoom -= (float)yoffset;
         if (renderer->cameraZoom < 1.0f)
             renderer->cameraZoom = 1.0f;
-        if (renderer->cameraZoom > 45.0f)
-            renderer->cameraZoom = 45.0f;
+        if (renderer->cameraZoom > 120.0f)
+            renderer->cameraZoom = 120.0f;
     });
 
     // Set key callback for input handling
@@ -153,7 +157,7 @@ void Renderer::run()
     setupShaders();
 
     // Set up camera
-    viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 10.0f),
+    viewMatrix = glm::lookAt(glm::vec3(5.0f, 5.0f, 15.0f), // Adjusted camera position
                              glm::vec3(0.0f, 0.0f, 0.0f),
                              glm::vec3(0.0f, 1.0f, 0.0f));
     projectionMatrix = glm::perspective(glm::radians(cameraZoom), 800.0f / 600.0f, 0.1f, 100.0f);
@@ -186,7 +190,7 @@ void Renderer::run()
         GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
         GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
         GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
-        GLint colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
+        // GLint colorLoc = glGetUniformLocation(shaderProgram, "objectColor"); // No longer needed
 
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
@@ -197,10 +201,13 @@ void Renderer::run()
             glBindVertexArray(renderObj.vao);
 
             // Set object-specific color
-            glUniform3fv(colorLoc, 1, glm::value_ptr(renderObj.color));
+            // glUniform3fv(colorLoc, 1, glm::value_ptr(renderObj.color)); // Not needed with per-vertex colors
 
             glDrawElements(GL_TRIANGLES, renderObj.indices.size(), GL_UNSIGNED_INT, 0);
         }
+
+        // Draw the axes after drawing the objects
+        drawAxes();
 
         // Swap buffers
         glfwSwapBuffers(window);
@@ -306,6 +313,11 @@ void Renderer::setupShaders()
 
     // Link shaders into program
     shaderProgram = glCreateProgram();
+
+    // Specify the locations of the attributes
+    glBindAttribLocation(shaderProgram, 0, "aPos");
+    glBindAttribLocation(shaderProgram, 1, "aColor");
+
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
@@ -340,6 +352,10 @@ void Renderer::addObject(const Object3D& object, const glm::vec3& color) {
         renderObj.vertices.push_back(v.getX());
         renderObj.vertices.push_back(v.getY());
         renderObj.vertices.push_back(v.getZ());
+        // Add color for each vertex (same color for the entire object)
+        renderObj.vertices.push_back(color.r);
+        renderObj.vertices.push_back(color.g);
+        renderObj.vertices.push_back(color.b);
         vertexIndexMap[i] = currentIndex++;
     }
 
@@ -371,13 +387,134 @@ void Renderer::addObject(const Object3D& object, const glm::vec3& color) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderObj.ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderObj.indices.size() * sizeof(unsigned int), renderObj.indices.data(), GL_STATIC_DRAW);
 
-    // Vertex attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
     // Unbind VAO
     glBindVertexArray(0);
 
     // Add to renderObjects list
     renderObjects.push_back(renderObj);
+}
+
+// **New function to draw axes with unit markers**
+void Renderer::drawAxes() {
+    // Define vertices for the axes
+    float axisLength = 5.0f; // Adjust as needed
+    float axisVertices[] = {
+        // Positions             // Colors (R, G, B)
+        // X-axis (Red)
+        0.0f, 0.0f, 0.0f,        1.0f, 0.0f, 0.0f, // Origin
+        axisLength, 0.0f, 0.0f,  1.0f, 0.0f, 0.0f, // X-axis endpoint
+
+        // Y-axis (Green)
+        0.0f, 0.0f, 0.0f,        0.0f, 1.0f, 0.0f, // Origin
+        0.0f, axisLength, 0.0f,  0.0f, 1.0f, 0.0f, // Y-axis endpoint
+
+        // Z-axis (Blue)
+        0.0f, 0.0f, 0.0f,        0.0f, 0.0f, 1.0f, // Origin
+        0.0f, 0.0f, axisLength,  0.0f, 0.0f, 1.0f  // Z-axis endpoint
+    };
+
+    GLuint axisVAO, axisVBO;
+    glGenVertexArrays(1, &axisVAO);
+    glGenBuffers(1, &axisVBO);
+
+    glBindVertexArray(axisVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, axisVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(axisVertices), axisVertices, GL_STATIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Use shader program
+    glUseProgram(shaderProgram);
+
+    // Set uniforms
+    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+    // Draw the axes
+    glBindVertexArray(axisVAO);
+    glDrawArrays(GL_LINES, 0, 6); // 6 vertices, 2 per axis
+
+    // Create unit markers for each axis
+    std::vector<float> unitMarkers;
+
+    // X-axis unit markers (Red)
+    for (int i = 1; i <= (int)axisLength; ++i) {
+        unitMarkers.push_back((float)i); // x
+        unitMarkers.push_back(0.0f);     // y
+        unitMarkers.push_back(0.0f);     // z
+        unitMarkers.push_back(1.0f);     // r
+        unitMarkers.push_back(0.0f);     // g
+        unitMarkers.push_back(0.0f);     // b
+    }
+
+    // Y-axis unit markers (Green)
+    for (int i = 1; i <= (int)axisLength; ++i) {
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back((float)i);
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back(1.0f);
+        unitMarkers.push_back(0.0f);
+    }
+
+    // Z-axis unit markers (Blue)
+    for (int i = 1; i <= (int)axisLength; ++i) {
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back((float)i);
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back(0.0f);
+        unitMarkers.push_back(1.0f);
+    }
+
+    // Set up VBO and VAO for unit markers
+    GLuint markersVAO, markersVBO;
+    glGenVertexArrays(1, &markersVAO);
+    glGenBuffers(1, &markersVBO);
+
+    glBindVertexArray(markersVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, markersVBO);
+    glBufferData(GL_ARRAY_BUFFER, unitMarkers.size() * sizeof(float), unitMarkers.data(), GL_STATIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Draw unit markers as points
+    glPointSize(5.0f); // Adjust point size as needed
+    glBindVertexArray(markersVAO);
+    glDrawArrays(GL_POINTS, 0, unitMarkers.size() / 6);
+
+    // Cleanup
+    glBindVertexArray(0);
+    glDeleteVertexArrays(1, &markersVAO);
+    glDeleteBuffers(1, &markersVBO);
+
+    glDeleteVertexArrays(1, &axisVAO);
+    glDeleteBuffers(1, &axisVBO);
 }
