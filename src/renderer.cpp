@@ -11,6 +11,7 @@
 
 // Shader sources
 const char* vertexShaderSource = R"(
+// Vertex Shader
 #version 330 core
 layout(location = 0) in vec3 aPos;
 
@@ -25,6 +26,7 @@ void main()
 )";
 
 const char* fragmentShaderSource = R"(
+// Fragment Shader
 #version 330 core
 out vec4 FragColor;
 
@@ -35,9 +37,6 @@ void main()
     FragColor = vec4(objectColor, 1.0);
 }
 )";
-
-
-// Rest of your Renderer class implementation...
 
 Renderer::Renderer()
     : window(nullptr), shaderProgram(0),
@@ -57,7 +56,6 @@ Renderer::~Renderer()
     glDeleteProgram(shaderProgram);
     glfwTerminate();
 }
-
 
 bool Renderer::initialize()
 {
@@ -99,11 +97,8 @@ bool Renderer::initialize()
     // Configure OpenGL settings
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    // glEnable(GL_CULL_FACE);
-    // glCullFace(GL_BACK);
-    // glFrontFace(GL_CCW);
 
-    glDisable(GL_CULL_FACE); // Disable face culling
+    glDisable(GL_CULL_FACE); // Disable face culling to see all faces
 
     // Set viewport size callback
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow*, int width, int height) {
@@ -128,9 +123,13 @@ bool Renderer::initialize()
         }
     });
 
+    // Enable wireframe mode to visualize inner structures
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // Enable blending for transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     return true;
 }
-
 
 void Renderer::setSlicingPlane(char axis, float position)
 {
@@ -148,7 +147,6 @@ void Renderer::setSlicingPlane(char axis, float position)
         slicingPlane.normal = Vertex(0.0f, 0.0f, 1.0f);
     }
 }
-
 
 void Renderer::run()
 {
@@ -210,8 +208,6 @@ void Renderer::run()
     }
 }
 
-
-
 void Renderer::processInput()
 {
     // Close window on ESC
@@ -224,39 +220,37 @@ void Renderer::processInput()
 
 void Renderer::handleSlicingInput()
 {
+    bool slicingPlaneChanged = false;
+
     // Check for axis change
     if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) {
         slicingAxis = 'X';
+        slicingPlaneChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS) {
         slicingAxis = 'Y';
+        slicingPlaneChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
         slicingAxis = 'Z';
+        slicingPlaneChanged = true;
     }
 
     // Adjust slicing position
     if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
         slicingPosition += 0.01f; // Adjust increment as needed
-        sliceObject();
-        updateBuffers();
+        slicingPlaneChanged = true;
     }
     if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
         slicingPosition -= 0.01f; // Adjust increment as needed
-        sliceObject();
-        updateBuffers();
+        slicingPlaneChanged = true;
     }
 
-    // Update slicing plane
-    if (slicingAxis == 'X') {
-        slicingPlane.point = Vertex(slicingPosition, 0.0f, 0.0f);
-        slicingPlane.normal = Vertex(1.0f, 0.0f, 0.0f);
-    } else if (slicingAxis == 'Y') {
-        slicingPlane.point = Vertex(0.0f, slicingPosition, 0.0f);
-        slicingPlane.normal = Vertex(0.0f, 1.0f, 0.0f);
-    } else if (slicingAxis == 'Z') {
-        slicingPlane.point = Vertex(0.0f, 0.0f, slicingPosition);
-        slicingPlane.normal = Vertex(0.0f, 0.0f, 1.0f);
+    if (slicingPlaneChanged) {
+        // Update slicing plane
+        setSlicingPlane(slicingAxis, slicingPosition);
+        // Re-slice and update buffers
+        sliceObject();
     }
 }
 
@@ -266,13 +260,25 @@ void Renderer::sliceObject()
     Object3D objectAbove, objectBelow;
     Slicer::sliceObject(originalObject, slicingPlane, objectAbove, objectBelow);
 
-    // For rendering, we'll display the part below the slicing plane
-    slicedObject = objectBelow;
+    // Clear previous render objects
+    for (auto& obj : renderObjects) {
+        glDeleteVertexArrays(1, &obj.vao);
+        glDeleteBuffers(1, &obj.vbo);
+        glDeleteBuffers(1, &obj.ebo);
+    }
+    renderObjects.clear();
+
+    // Add the sliced outer cube
+    addObject(objectBelow, glm::vec3(0.7f, 0.7f, 0.7f)); // Gray color
+
+    // Optionally, attempt to distinguish inner cube
+    // Since we cannot modify the input file, we can attempt to render the inner cube differently
+    // For demonstration, we can render the entire object with a different color or use transparency
 }
 
 void Renderer::setupShaders()
 {
-// Compile vertex shader
+    // Compile vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
@@ -314,65 +320,6 @@ void Renderer::setupShaders()
     // Delete shaders
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
-}
-
-void Renderer::setupBuffers()
-{
-    // Convert sliced object data to OpenGL buffers
-    vertices.clear();
-    indices.clear();
-
-    // Map from Object3D vertex indices to OpenGL indices
-    std::map<int, unsigned int> vertexIndexMap;
-
-    unsigned int currentIndex = 0;
-    for (size_t i = 0; i < slicedObject.vertices.size(); ++i) {
-        const Vertex& v = slicedObject.vertices[i];
-        vertices.push_back(v.getX());
-        vertices.push_back(v.getY());
-        vertices.push_back(v.getZ());
-        vertexIndexMap[i] = currentIndex++;
-    }
-
-    for (const auto& face : slicedObject.faces) {
-        const std::vector<int>& faceIndices = face.getVertexIndices();
-        // Triangulate faces
-        for (size_t i = 1; i + 1 < faceIndices.size(); ++i) {
-            unsigned int idx0 = vertexIndexMap[faceIndices[0]];
-            unsigned int idx1 = vertexIndexMap[faceIndices[i]];
-            unsigned int idx2 = vertexIndexMap[faceIndices[i + 1]];
-            indices.push_back(idx0);
-            indices.push_back(idx1);
-            indices.push_back(idx2);
-        }
-    }
-
-    // Generate and bind VAO, VBO, EBO
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ebo);
-
-    updateBuffers();
-}
-
-void Renderer::updateBuffers()
-{
-    glBindVertexArray(vao);
-
-    // Vertex buffer
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
-
-    // Element buffer
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-    // Vertex attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Unbind VAO
-    glBindVertexArray(0);
 }
 
 void Renderer::addObject(const Object3D& object, const glm::vec3& color) {

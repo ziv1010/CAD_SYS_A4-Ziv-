@@ -13,6 +13,8 @@ int main() {
     // Read the 3D object from the input file
     read3DObjectFromFile("build/output/input3D.txt", object);
 
+    
+
     // Ask the user for slicing plane parameters
     char axis;
     float position;

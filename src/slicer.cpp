@@ -141,6 +141,5 @@ void Slicer::sliceObject(const Object3D& object, const Plane& plane, Object3D& o
         }
     }
 
-    // Edges need to be reconstructed similarly
-    // For simplicity, you can reconstruct edges from faces or skip them if not needed
+    // Note: Edges can be reconstructed from faces if needed.
 }
