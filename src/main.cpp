@@ -30,9 +30,18 @@ int main() {
     // Set initial slicing plane
     renderer.setSlicingPlane(axis, position);
 
-    // Run renderer with the original object
-    renderer.run(object);
+    // Slice the object
+    Object3D objectAbove, objectBelow;
+    Slicer::sliceObject(object, renderer.getSlicingPlane(), objectAbove, objectBelow);
 
+    // Add the original object to the renderer (before slicing)
+    renderer.addObject(object, glm::vec3(0.5f, 0.5f, 0.5f)); // Gray color
+
+    // Add the sliced object to the renderer (after slicing)
+    renderer.addObject(objectBelow, glm::vec3(1.0f, 0.0f, 0.0f)); // Red color
+
+    // Run renderer
+    renderer.run();
 
     // Project the 3D object onto 2D planes
     Projection2D topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden;

@@ -7,17 +7,19 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+
 class Renderer {
 public:
     Renderer();
     ~Renderer();
 
     bool initialize();
-    void run(const Object3D& object);
+    void run();
 
     // Set initial slicing plane
     void setSlicingPlane(char axis, float position);
-
+    void addObject(const Object3D& object, const glm::vec3& color);
+    const Slicer::Plane& getSlicingPlane() const { return slicingPlane; }
 private:
     GLFWwindow* window;
     GLuint vao, vbo, ebo;
@@ -27,6 +29,7 @@ private:
     glm::mat4 projectionMatrix;
 
     float cameraZoom;
+    float rotationAngle; // For rotation
 
     // Original and sliced objects
     Object3D originalObject;
@@ -50,6 +53,18 @@ private:
 
     // Input handling
     void handleSlicingInput();
+
+    struct RenderObject {
+    Object3D object;
+    glm::vec3 color;
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
+};
+ std::vector<RenderObject> renderObjects;
+ 
 };
 
 #endif // RENDERER_H

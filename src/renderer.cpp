@@ -28,9 +28,11 @@ const char* fragmentShaderSource = R"(
 #version 330 core
 out vec4 FragColor;
 
+uniform vec3 objectColor;
+
 void main()
 {
-    FragColor = vec4(0.7, 0.7, 0.7, 1.0);
+    FragColor = vec4(objectColor, 1.0);
 }
 )";
 
@@ -95,7 +97,7 @@ bool Renderer::initialize()
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-    
+
     // Set viewport size callback
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow*, int width, int height) {
         glViewport(0, 0, width, height);
@@ -139,56 +141,66 @@ void Renderer::setSlicingPlane(char axis, float position)
     }
 }
 
-void Renderer::run(const Object3D& object)
+void Renderer::run()
 {
-    // Store original object
-    originalObject = object;
-
     setupShaders();
-    sliceObject(); // Initial slicing
-    setupBuffers();
 
     // Set up camera
-    viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 5.0f),
+    viewMatrix = glm::lookAt(glm::vec3(0.0f, 0.0f, 10.0f),
                              glm::vec3(0.0f, 0.0f, 0.0f),
                              glm::vec3(0.0f, 1.0f, 0.0f));
     projectionMatrix = glm::perspective(glm::radians(cameraZoom), 800.0f / 600.0f, 0.1f, 100.0f);
 
-    // No rotation
-    modelMatrix = glm::mat4(1.0f);
+    // Initialize rotation angle
+    rotationAngle = 0.0f;
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
-    processInput();
+        processInput();
 
-    // Clear the screen and depth buffer
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Clear the screen and depth buffer
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Update projection matrix in case cameraZoom changed
-    projectionMatrix = glm::perspective(glm::radians(cameraZoom), 800.0f / 600.0f, 0.1f, 100.0f);
+        // Update rotation
+        rotationAngle += 0.5f; // Adjust rotation speed as needed
+        if (rotationAngle > 360.0f)
+            rotationAngle -= 360.0f;
 
-    // Use shader
-    glUseProgram(shaderProgram);
+        // Update model matrix with rotation
+        modelMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(rotationAngle), glm::vec3(0.0f, 1.0f, 0.0f));
 
-    // Set uniforms
-    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+        // Update projection matrix in case cameraZoom changed
+        projectionMatrix = glm::perspective(glm::radians(cameraZoom), 800.0f / 600.0f, 0.1f, 100.0f);
 
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+        // Use shader
+        glUseProgram(shaderProgram);
 
-    // Draw object
-    glBindVertexArray(vao);
-    glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        // Set uniforms
+        GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+        GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+        GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+        GLint colorLoc = glGetUniformLocation(shaderProgram, "objectColor");
 
-    // Swap buffers
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+
+        // Draw each object
+        for (const auto& renderObj : renderObjects) {
+            glBindVertexArray(renderObj.vao);
+
+            // Set object-specific uniforms
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+            glUniform3fv(colorLoc, 1, glm::value_ptr(renderObj.color));
+
+            glDrawElements(GL_TRIANGLES, renderObj.indices.size(), GL_UNSIGNED_INT, 0);
+        }
+
+        // Swap buffers
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
 }
 
-}
 
 void Renderer::processInput()
 {
@@ -351,4 +363,64 @@ void Renderer::updateBuffers()
 
     // Unbind VAO
     glBindVertexArray(0);
+}
+
+void Renderer::addObject(const Object3D& object, const glm::vec3& color) {
+    RenderObject renderObj;
+    renderObj.object = object;
+    renderObj.color = color;
+
+    // Convert object data to OpenGL buffers
+    renderObj.vertices.clear();
+    renderObj.indices.clear();
+
+    // Map from Object3D vertex indices to OpenGL indices
+    std::map<int, unsigned int> vertexIndexMap;
+
+    unsigned int currentIndex = 0;
+    for (size_t i = 0; i < object.vertices.size(); ++i) {
+        const Vertex& v = object.vertices[i];
+        renderObj.vertices.push_back(v.getX());
+        renderObj.vertices.push_back(v.getY());
+        renderObj.vertices.push_back(v.getZ());
+        vertexIndexMap[i] = currentIndex++;
+    }
+
+    for (const auto& face : object.faces) {
+        const std::vector<int>& faceIndices = face.getVertexIndices();
+        // Triangulate faces
+        for (size_t i = 1; i + 1 < faceIndices.size(); ++i) {
+            unsigned int idx0 = vertexIndexMap[faceIndices[0]];
+            unsigned int idx1 = vertexIndexMap[faceIndices[i]];
+            unsigned int idx2 = vertexIndexMap[faceIndices[i + 1]];
+            renderObj.indices.push_back(idx0);
+            renderObj.indices.push_back(idx1);
+            renderObj.indices.push_back(idx2);
+        }
+    }
+
+    // Generate and bind VAO, VBO, EBO
+    glGenVertexArrays(1, &renderObj.vao);
+    glGenBuffers(1, &renderObj.vbo);
+    glGenBuffers(1, &renderObj.ebo);
+
+    glBindVertexArray(renderObj.vao);
+
+    // Vertex buffer
+    glBindBuffer(GL_ARRAY_BUFFER, renderObj.vbo);
+    glBufferData(GL_ARRAY_BUFFER, renderObj.vertices.size() * sizeof(float), renderObj.vertices.data(), GL_STATIC_DRAW);
+
+    // Element buffer
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, renderObj.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, renderObj.indices.size() * sizeof(unsigned int), renderObj.indices.data(), GL_STATIC_DRAW);
+
+    // Vertex attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Unbind VAO
+    glBindVertexArray(0);
+
+    // Add to renderObjects list
+    renderObjects.push_back(renderObj);
 }
