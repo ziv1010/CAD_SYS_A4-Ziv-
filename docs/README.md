@@ -1,368 +1,294 @@
-# README
+# 3D to 2D Projection and 2D to 3D Reconstruction System
 
-## 3D Model Reconstruction and Projection System
+This project contains two programs:
 
-This system allows for the reconstruction of 3D models from 2D orthographic projections (top, front, and side views) and generates 2D projections from 3D models. It includes rendering capabilities for both 2D and 3D models, with interactive 3D visualization.
+1. **3D to 2D Projection Program**: Performs geometric transformations, slicing, and generates orthographic projections (top, front, side views) from a 3D object. It also calculates the surface area and volume of the 3D object.
 
----
+2. **2D to 3D Reconstruction Program**: Reconstructs a 3D wireframe model from three orthographic 2D projections (Top View, Front View, and Side View).
 
-## Table of Contents
+## Features
 
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Input Formats](#input-formats)
-  - [2D Input Format](#2d-input-format)
-  - [3D Input Format](#3d-input-format)
-- [Usage](#usage)
-  - [Compiling the Code](#compiling-the-code)
-  - [Running the Program](#running-the-program)
-- [Examples](#examples)
-- [Limitations](#limitations)
-- [Support](#support)
+### 3D to 2D Projection Program
 
----
+- Reads a 3D object from an input file.
+- Applies geometric transformations: rotation, translation, scaling.
+- Performs slicing of the object with a plane.
+- Generates orthographic projections with hidden line removal.
+- Calculates surface area and volume.
+- Visualizes the 3D object using OpenGL.
 
-## Prerequisites
+### 2D to 3D Reconstruction Program
 
-Before running the system, ensure that you have the following installed on your machine:
-
-- **C++ Compiler** with C++11 support (e.g., `g++`, `clang++`)
-- **OpenGL Libraries** for rendering:
-  - **GLEW** (OpenGL Extension Wrangler Library)
-  - **GLFW** (Graphics Library Framework)
-- **GLM** (OpenGL Mathematics Library) for mathematical computations
-- **Python 3** (optional, for running the visualization scripts)
-  - **Matplotlib** (if you wish to use the Python plotting scripts)
-
----
+- Reads 2D projections from input files.
+- Processes the input data to remove duplicates and handle intersections.
+- Constructs probable 3D vertices and edges.
+- Validates the vertices and edges to remove pseudo-elements.
+- Generates a 3D wireframe model.
 
 ## Installation
 
-### Installing Required Packages on Linux (Ubuntu/Debian)
+### Dependencies
 
-1. **Update Package Lists:**
+The project requires the following dependencies:
 
-   ```bash
-   sudo apt update
-   ```
+- **OpenGL**: Cross-language, cross-platform API for rendering 2D and 3D vector graphics.
+- **GLFW**: Open Source, multi-platform library for OpenGL, OpenGL ES, and Vulkan development on the desktop.
+- **GLEW**: The OpenGL Extension Wrangler Library.
+- **GLM**: OpenGL Mathematics library.
 
-2. **Install Build-Essential Tools:**
+#### Installing Dependencies on Linux (Ubuntu/Debian)
 
-   ```bash
-   sudo apt install build-essential
-   ```
+You can install the required dependencies using your package manager:
 
-3. **Install OpenGL Libraries:**
-
-   ```bash
-   sudo apt install libgl1-mesa-dev
-   ```
-
-4. **Install GLEW and GLFW:**
-
-   ```bash
-   sudo apt install libglew-dev libglfw3-dev
-   ```
-
-5. **Install GLM Library:**
-
-   ```bash
-   sudo apt install libglm-dev
-   ```
-
-6. **Install Python 3 and Matplotlib (Optional):**
-
-   ```bash
-   sudo apt install python3 python3-pip
-   pip3 install matplotlib
-   ```
-
-### Installing Required Packages on macOS
-
-1. **Install Homebrew** (if not already installed):
-
-   ```bash
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
-
-2. **Install Packages via Homebrew:**
-
-   ```bash
-   brew install glew glfw glm
-   ```
-
-3. **Install Python 3 and Matplotlib (Optional):**
-
-   ```bash
-   brew install python3
-   pip3 install matplotlib
-   ```
-
-### Installing Required Packages on Windows
-
-1. **Install a C++ Compiler:**
-
-   - Install [MinGW-w64](http://mingw-w64.org/doku.php) or use the compiler provided with Visual Studio.
-
-2. **Install OpenGL Libraries:**
-
-   - Download and install [GLEW](http://glew.sourceforge.net/) and [GLFW](https://www.glfw.org/).
-
-3. **Install GLM Library:**
-
-   - Download GLM from [here](https://github.com/g-truc/glm/releases) and include it in your project.
-
-4. **Install Python 3 and Matplotlib (Optional):**
-
-   - Download Python 3 from [python.org](https://www.python.org/downloads/windows/).
-   - Install Matplotlib:
-
-     ```bash
-     pip install matplotlib
-     ```
-
----
-
-## Input Formats
-
-### 2D Input Format
-
-The 2D input file should start with the number `2`, indicating that it contains 2D data.
-
-**Structure:**
-
-```
-2
-[Direction]
-[Number of Vertices]
-[Vertex Data]
-[Number of Edges]
-[Edge Data]
-[Repeat for each view (Top, Front, Side)]
+```bash
+sudo apt-get update
+sudo apt-get install build-essential cmake
+sudo apt-get install libglfw3-dev libglew-dev libglm-dev
+sudo apt-get install freeglut3-dev
 ```
 
-**Details:**
+#### Installing Dependencies on Windows
 
-- **Direction:** Integer indicating the view direction.
-  - `0` - Top View
-  - `1` - Front View
-  - `2` - Side View
-- **Vertex Data:** Each vertex is defined as:
+- Install [Visual Studio](https://visualstudio.microsoft.com/) for C++ development.
+- Download and install the precompiled binaries for GLFW and GLEW.
+- Ensure that the include directories and libraries are correctly set in your project settings.
 
-  ```
-  [vNo] [coord1] [coord2]
-  ```
+#### Installing Dependencies on macOS
 
-  - `vNo`: Vertex number (integer)
-  - `coord1`, `coord2`: Coordinates in the 2D plane (floats)
-
-- **Edge Data:** Each edge is defined as:
-
-  ```
-  [eno] [vNoA] [vNoB] [hidden]
-  ```
-
-  - `eno`: Edge number (integer)
-  - `vNoA`, `vNoB`: Vertex numbers defining the edge
-  - `hidden`: Visibility flag (`0` for visible, `1` for hidden)
-
-**Example:**
-
-```
-2
-0
-4
-1 0.0 0.0
-2 1.0 0.0
-3 1.0 1.0
-4 0.0 1.0
-4
-1 1 2 0
-2 2 3 0
-3 3 4 0
-4 4 1 0
-1
-4
-1 0.0 0.0
-2 1.0 0.0
-3 1.0 1.0
-4 0.0 1.0
-4
-1 1 2 0
-2 2 3 0
-3 3 4 0
-4 4 1 0
-2
-...
+```bash
+brew install cmake glfw glew glm
 ```
 
-### 3D Input Format
+### Building the Project
 
-The 3D input file should start with the number `3`, indicating that it contains 3D data.
+1. **Clone the Repository**
 
-**Structure:**
+   ```bash
+   git clone https://github.com/yourusername/yourrepository.git
+   cd yourrepository
+   ```
 
-```
-3
-[Number of Vertices]
-[Vertex Data]
-[Number of Edges]
-[Edge Data]
-[Number of Surfaces]
-[Surface Data]
-```
+2. **Create Build Directory**
 
-**Details:**
+   ```bash
+   mkdir build
+   cd build
+   ```
 
-- **Vertex Data:** Each vertex is defined as:
+3. **Configure the Project with CMake**
 
-  ```
-  [vNo] [x] [y] [z]
-  ```
+   ```bash
+   cmake ..
+   ```
 
-  - `vNo`: Vertex number (integer)
-  - `x`, `y`, `z`: Coordinates in 3D space (floats)
+4. **Build the Project**
 
-- **Edge Data:** Each edge is defined as:
+   ```bash
+   make
+   ```
 
-  ```
-  [eno] [vNoA] [vNoB]
-  ```
-
-  - `eno`: Edge number (integer)
-  - `vNoA`, `vNoB`: Vertex numbers defining the edge
-
-- **Surface Data:** Each surface is defined as:
-
-  ```
-  [sno] [Number of Boundary Edges] [eno1] [eno2] ... [enoN]
-  ```
-
-  - `sno`: Surface number (integer)
-  - `Number of Boundary Edges`: Number of edges forming the surface boundary
-  - `eno1`, `eno2`, ..., `enoN`: Edge numbers forming the boundary
-
-**Example:**
-
-```
-3
-4
-1 0.0 0.0 0.0
-2 1.0 0.0 0.0
-3 1.0 1.0 0.0
-4 0.0 1.0 0.0
-4
-1 1 2
-2 2 3
-3 3 4
-4 4 1
-1
-1 4 1 2 3 4
-```
-
----
+   This will compile the code and create executables in the `build/output/` directory.
 
 ## Usage
 
-### Compiling the Code
+### Running the 3D to 2D Projection Program
 
-1. **Navigate to the Project Directory:**
+1. **Prepare the Input File**
 
-   ```bash
-   cd /path/to/project
-   ```
+   - Place your 3D object file (e.g., `input3Dcube.txt`) in the `build/output/` directory.
+   - Ensure the file follows the specified 3D Object Input Format (see [Input File Formats](#input-file-formats)).
 
-2. **Compile the Code:**
+2. **Specify the Input File in the Code**
 
-   ```bash
-   g++ -std=c++11 main.cpp Renderer.cpp Vertex.cpp Edge.cpp Face.cpp 2Dto3DModel.cpp 3Dto2DModel.cpp -o model_converter -lGL -lGLEW -lglfw -lglm
-   ```
+   - Open `main.cpp` in the `src/` directory with your preferred text editor.
+   - Locate the line where the input file is specified:
 
-   - Ensure all `.cpp` and `.h` files are in the same directory.
-   - Adjust library links (`-lGL`, `-lGLEW`, `-lglfw`, `-lglm`) based on your system.
+     ```cpp
+     read3DObjectFromFile("build/output/input3Dcube.txt", originalObject);
+     ```
 
-### Running the Program
+   - Change `"build/output/input3Dcube.txt"` to the path of your input file if necessary.
 
-The program can process both 2D and 3D input files.
+3. **Compile and Run the Program**
 
-1. **Run the Program with an Input File:**
-
-   ```bash
-   ./model_converter input.txt
-   ```
-
-   - Replace `input.txt` with the path to your input file.
-
-2. **Follow On-Screen Prompts:**
-
-   - The program may prompt for an output file path to save the results.
-   - It will also display rendered models in a window.
-
-3. **Interactive Controls for 3D Rendering:**
-
-   - **Rotate Model:** Click and drag with the left mouse button.
-   - **Zoom In/Out:** Use the mouse scroll wheel.
-   - **Reset View:** Press the `R` key.
-
----
-
-## Examples
-
-### Example 1: Converting 2D Projections to 3D Model
-
-1. **Prepare Input File (`2d_input.txt`):**
-
-   - Include the 2D projections as per the 2D input format.
-
-2. **Run the Program:**
+   From the `build/` directory:
 
    ```bash
-   ./model_converter 2d_input.txt
+   make
+   ./output/app
    ```
 
-3. **Output:**
+   - The program will display a menu in the terminal. Follow the prompts to perform transformations, slicing, or projections.
 
-   - The program generates a 3D model and saves it to the specified output file.
-   - A window displays the reconstructed 3D model.
+4. **View the Output**
 
-### Example 2: Generating 2D Projections from a 3D Model
+   - The program will generate output files in the `build/output/` directory, including images (`.png`) and text files (`.txt`) of the projections.
 
-1. **Prepare Input File (`3d_input.txt`):**
+### Running the 2D to 3D Reconstruction Program
 
-   - Include the 3D model data as per the 3D input format.
+1. **Prepare the Input File**
 
-2. **Run the Program:**
+   - Place your 2D projections file (e.g., `input2d.txt`) in the `build/output/` directory.
+   - Ensure the file follows the specified 2D Projection Input Format (see [Input File Formats](#input-file-formats)).
+
+2. **Specify the Input File in the Code**
+
+   - Open `main.cpp` in the `src/` directory with your preferred text editor.
+   - Locate the line where the input file is specified:
+
+     ```cpp
+     readGraphsFromFile("build/output/input2d.txt", topView, frontView, sideView);
+     ```
+
+   - Change `"build/output/input2d.txt"` to the path of your input file if necessary.
+
+3. **Compile and Run the Program**
+
+   From the `build/` directory:
 
    ```bash
-   ./model_converter 3d_input.txt
+   make
+   ./output/app
    ```
 
-3. **Output:**
+   - The program will process the input data and reconstruct the 3D wireframe model.
 
-   - The program generates 2D projections and saves them to the specified output file.
-   - A window displays the generated 2D views.
+4. **View the Output**
 
----
+   - The program will generate an output file (e.g., `output.txt`) in the `build/output/` directory containing the reconstructed 3D model data.
 
-## Limitations
+## Input File Formats
 
-- **Performance Constraints:**
-  - The system may experience performance issues with extremely large models due to increased computational complexity.
-  - Large input files can consume significant memory resources.
+### 3D Object Input Format
 
-- **Unsupported Functionality:**
-  - Transformation operations like rotation, translation, and scaling are not supported within the system (other than for rendering purposes).
-  - Object segmentation (cutting the model into parts) is not implemented.
-  - Extremely complex surfaces or non-manifold geometries may not be correctly processed.
+The 3D object file should follow this format:
 
-- **Model Reusability:**
-  - The output files generated by the system can be directly used as input files. This allows for iterative processing and testing without format conversion.
-  - Users can input 2D projections, obtain a 3D model, and then use that 3D model as input to generate 2D projections again.
+1. **Number of Vertices (V)**: An integer specifying the total number of vertices.
 
----
+2. **Vertex Coordinates**: V lines, each containing three floating-point numbers representing x, y, z coordinates.
 
+3. **Number of Edges (E)**: An integer specifying the total number of edges.
 
+4. **Edge Indices**: E lines, each containing two integers representing indices of the vertices that form the edge.
 
-**Note:** Ensure that you have the necessary permissions and rights to use and modify the code and that you comply with any applicable licenses.
+5. **Number of Faces (F)**: An integer specifying the total number of faces.
+
+6. **Faces Definition**: F blocks, each starting with an integer N (number of vertices in the face), followed by N integers representing vertex indices.
+
+**Example:**
+
+```
+8
+0 0 0
+1 0 0
+1 1 0
+0 1 0
+0 0 1
+1 0 1
+1 1 1
+0 1 1
+12
+0 1
+1 2
+2 3
+3 0
+4 5
+5 6
+6 7
+7 4
+0 4
+1 5
+2 6
+3 7
+6
+4 0 1 2 3
+4 4 5 6 7
+4 0 1 5 4
+4 1 2 6 5
+4 2 3 7 6
+4 3 0 4 7
+```
+
+### 2D Projection Input Format
+
+The 2D projections file should follow this format for each view:
+
+1. **View Name**: Either `Top_View`, `Front_View`, or `Side_View`.
+
+2. **Number of Vertices (V)**: An integer specifying the total number of vertices.
+
+3. **Vertex Coordinates**: V lines, each containing two floating-point numbers representing x and y coordinates.
+
+4. **Number of Edges (E)**: An integer specifying the total number of edges.
+
+5. **Edge Definitions**: E lines, each containing two integers representing the indices of the start and end vertices and a string indicating the line type (`solid` or `dashed`).
+
+**Example:**
+
+```
+Top_View
+5
+0 0
+1 0
+1 1
+0 1
+0.5 0.5
+6
+0 1 solid
+1 2 solid
+2 3 solid
+3 0 solid
+0 4 dashed
+2 4 dashed
+Front_View
+...
+Side_View
+...
+```
+
+Repeat this format for each view in the same file.
+
+## Code Structure
+
+- **src/**: Contains all the source code files.
+  - **main.cpp**: Entry point of the application.
+  - **object3d.h/.cpp**: Definition and implementation of the `Object3D` class for 3D objects.
+  - **vertex3d.h/.cpp**: Definition and implementation of the `Vertex3D` class.
+  - **edge3d.h/.cpp**: Definition and implementation of the `Edge3D` class.
+  - **face3d.h/.cpp**: Definition and implementation of the `Face3D` class.
+  - **graph2d.h/.cpp**: Classes and methods for handling 2D projections.
+  - **wireframe_model.h/.cpp**: Methods for reconstructing the 3D wireframe model from 2D projections.
+  - **renderer.h/.cpp**: Handles visualization using OpenGL.
+  - **transformations.h/.cpp**: Contains geometric transformation functions.
+  - **file_io.h/.cpp**: Functions for reading and writing data to files.
+- **build/**: Build directory containing compiled binaries and output files.
+  - **output/**: Directory where output images and text files are saved.
+- **CMakeLists.txt**: Build configuration file for CMake.
+
+## Notes
+
+- **Choosing Input Files**: Before running the programs, ensure you specify the correct input file paths in the `main.cpp` files.
+- **Running the Executable**: After building, the executable can be run from the `build/` directory using:
+
+  ```bash
+  ./output/app
+  ```
+
+- **Rebuilding the Project**: If you make changes to the source code or input files, recompile using:
+
+  ```bash
+  make
+  ```
+
+## License
+
+[Specify your project's license here, e.g., MIT License.]
+
+## Acknowledgments
+
+- [GLFW](https://www.glfw.org/)
+- [GLEW](http://glew.sourceforge.net/)
+- [OpenGL](https://www.opengl.org/)
+- [GLM](https://github.com/g-truc/glm)
 
 ---
