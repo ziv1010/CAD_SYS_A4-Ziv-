@@ -1,3 +1,33 @@
 Vertices:
+0: 0 0 0
+1: 0 0 1
+2: 0 1 0
+3: 0 1 1
+4: 1 0 0
+5: 1 0 1
+6: 1 1 0
+7: 1 1 1
 Edges:
+0 1
+0 2
+0 4
+0 5
+1 3
+1 5
+2 3
+2 6
+2 7
+3 7
+4 5
+4 6
+5 7
+6 7
 Faces:
+Face with vertices: 0 2 3 1
+Face with vertices: 0 4 5
+Face with vertices: 0 5 1
+Face with vertices: 2 6 4 0
+Face with vertices: 2 7 3
+Face with vertices: 5 7 2 0
+Face with vertices: 6 7 2
+Face with vertices: 7 3 1 5
