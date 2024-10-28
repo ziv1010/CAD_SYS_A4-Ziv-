@@ -36,36 +36,41 @@ void main()
 }
 )";
 
+
 // Rest of your Renderer class implementation...
 
 Renderer::Renderer()
-    : window(nullptr), vao(0), vbo(0), ebo(0), shaderProgram(0),
-      cameraZoom(45.0f), slicingAxis('X'), slicingPosition(0.0f)
+    : window(nullptr), shaderProgram(0),
+      cameraZoom(45.0f), rotationAngle(0.0f),
+      slicingAxis('X'), slicingPosition(0.0f)
 {
 }
 
 Renderer::~Renderer()
 {
     // Cleanup
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
-    glDeleteBuffers(1, &ebo);
+    for (auto& obj : renderObjects) {
+        glDeleteVertexArrays(1, &obj.vao);
+        glDeleteBuffers(1, &obj.vbo);
+        glDeleteBuffers(1, &obj.ebo);
+    }
+    glDeleteProgram(shaderProgram);
     glfwTerminate();
 }
 
+
 bool Renderer::initialize()
 {
-    // Initialization code remains the same...
-     // Initialize GLFW
+    // Initialize GLFW
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         return false;
     }
 
-     // **Add these lines to request OpenGL 3.3 core profile**
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // OpenGL version 3.x
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); // OpenGL version x.3
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // Use core profile
+    // Request OpenGL 3.3 core profile context
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // OpenGL major version
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); // OpenGL minor version
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // Core profile
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // Required on macOS
@@ -84,19 +89,21 @@ bool Renderer::initialize()
     glfwSetWindowUserPointer(window, this);
 
     // Initialize GLEW
-    glewExperimental = true; // Needed for core profile
+    glewExperimental = GL_TRUE; // Needed for core profiles
     GLenum err = glewInit();
     if (err != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW:" << glewGetErrorString(err) << std::endl;
+        std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(err) << std::endl;
         return false;
     }
 
     // Configure OpenGL settings
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
+    // glFrontFace(GL_CCW);
+
+    glDisable(GL_CULL_FACE); // Disable face culling
 
     // Set viewport size callback
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow*, int width, int height) {
@@ -111,8 +118,8 @@ bool Renderer::initialize()
             renderer->cameraZoom = 1.0f;
         if (renderer->cameraZoom > 45.0f)
             renderer->cameraZoom = 45.0f;
-        renderer->projectionMatrix = glm::perspective(glm::radians(renderer->cameraZoom), 800.0f / 600.0f, 0.1f, 100.0f);
     });
+
     // Set key callback for input handling
     glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
         Renderer* renderer = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
@@ -123,6 +130,7 @@ bool Renderer::initialize()
 
     return true;
 }
+
 
 void Renderer::setSlicingPlane(char axis, float position)
 {
@@ -140,6 +148,7 @@ void Renderer::setSlicingPlane(char axis, float position)
         slicingPlane.normal = Vertex(0.0f, 0.0f, 1.0f);
     }
 }
+
 
 void Renderer::run()
 {
@@ -183,13 +192,13 @@ void Renderer::run()
 
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(viewMatrix));
         glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
 
         // Draw each object
         for (const auto& renderObj : renderObjects) {
             glBindVertexArray(renderObj.vao);
 
-            // Set object-specific uniforms
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+            // Set object-specific color
             glUniform3fv(colorLoc, 1, glm::value_ptr(renderObj.color));
 
             glDrawElements(GL_TRIANGLES, renderObj.indices.size(), GL_UNSIGNED_INT, 0);
@@ -200,6 +209,7 @@ void Renderer::run()
         glfwPollEvents();
     }
 }
+
 
 
 void Renderer::processInput()

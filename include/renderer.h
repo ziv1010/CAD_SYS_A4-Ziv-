@@ -6,7 +6,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-
+#include <vector>
 
 class Renderer {
 public:
@@ -54,17 +54,18 @@ private:
     // Input handling
     void handleSlicingInput();
 
+     // Renderable objects
     struct RenderObject {
-    Object3D object;
-    glm::vec3 color;
-    GLuint vao;
-    GLuint vbo;
-    GLuint ebo;
-    std::vector<float> vertices;
-    std::vector<unsigned int> indices;
-};
- std::vector<RenderObject> renderObjects;
- 
+        Object3D object;
+        glm::vec3 color;
+        GLuint vao;
+        GLuint vbo;
+        GLuint ebo;
+        std::vector<float> vertices;
+        std::vector<unsigned int> indices;
+    };
+
+    std::vector<RenderObject> renderObjects;
 };
 
 #endif // RENDERER_H

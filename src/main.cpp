@@ -4,6 +4,8 @@
 #include <iostream>
 #include "transformations.h"
 #include "renderer.h"
+#include "slicer.h"
+
 
 int main() {
     Object3D object;
@@ -11,8 +13,7 @@ int main() {
     // Read the 3D object from the input file
     read3DObjectFromFile("build/output/input3D.txt", object);
 
-
-    // Ask the user for initial slicing plane parameters
+    // Ask the user for slicing plane parameters
     char axis;
     float position;
     std::cout << "Enter slicing axis (X, Y, Z): ";
@@ -27,21 +28,19 @@ int main() {
         return -1;
     }
 
-    // Set initial slicing plane
+    // Set slicing plane
     renderer.setSlicingPlane(axis, position);
 
     // Slice the object
     Object3D objectAbove, objectBelow;
     Slicer::sliceObject(object, renderer.getSlicingPlane(), objectAbove, objectBelow);
 
-    // Add the original object to the renderer (before slicing)
-    renderer.addObject(object, glm::vec3(0.5f, 0.5f, 0.5f)); // Gray color
-
-    // Add the sliced object to the renderer (after slicing)
+    // Add the sliced part to the renderer
     renderer.addObject(objectBelow, glm::vec3(1.0f, 0.0f, 0.0f)); // Red color
 
     // Run renderer
     renderer.run();
+
 
     // Project the 3D object onto 2D planes
     Projection2D topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden;
