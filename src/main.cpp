@@ -3,12 +3,36 @@
 #include "file_io.h"
 #include <iostream>
 #include "transformations.h"
+#include "renderer.h"
 
 int main() {
     Object3D object;
 
     // Read the 3D object from the input file
     read3DObjectFromFile("build/output/input3D.txt", object);
+
+
+    // Ask the user for initial slicing plane parameters
+    char axis;
+    float position;
+    std::cout << "Enter slicing axis (X, Y, Z): ";
+    std::cin >> axis;
+    axis = toupper(axis);
+    std::cout << "Enter slicing position along axis " << axis << ": ";
+    std::cin >> position;
+
+    // Create renderer
+    Renderer renderer;
+    if (!renderer.initialize()) {
+        return -1;
+    }
+
+    // Set initial slicing plane
+    renderer.setSlicingPlane(axis, position);
+
+    // Run renderer with the original object
+    renderer.run(object);
+
 
     // Project the 3D object onto 2D planes
     Projection2D topViewWithoutHidden, frontViewWithoutHidden, sideViewWithoutHidden;
