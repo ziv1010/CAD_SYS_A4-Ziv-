@@ -35,6 +35,9 @@ int main() {
     Object3D objectAbove, objectBelow;
     Slicer::sliceObject(object, renderer.getSlicingPlane(), objectAbove, objectBelow);
 
+    // Add the original object to the renderer
+    //renderer.addObject(object, glm::vec3(0.5f, 0.5f, 0.5f)); // Gray color
+
     // Add the sliced part to the renderer
     renderer.addObject(objectBelow, glm::vec3(1.0f, 0.0f, 0.0f)); // Red color
 
