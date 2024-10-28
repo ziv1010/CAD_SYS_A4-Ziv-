@@ -277,4 +277,3 @@ float Object3D::computeVolume() const {
 
     return std::abs(totalVolume);
 }
-

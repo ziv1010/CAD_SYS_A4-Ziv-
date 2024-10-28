@@ -13,8 +13,8 @@ int main() {
     // Read the 3D object from the input file
     read3DObjectFromFile("build/output/input3D.txt", object);
 
-    
-
+    Transformations::rotateX(object, 90.0f);
+    Transformations::scale(object, 2.0f);
     // Ask the user for slicing plane parameters
     char axis;
     float position;
@@ -38,7 +38,7 @@ int main() {
     Slicer::sliceObject(object, renderer.getSlicingPlane(), objectAbove, objectBelow);
 
     // Add the original object to the renderer
-    //renderer.addObject(object, glm::vec3(0.5f, 0.5f, 0.5f)); // Gray color
+    renderer.addObject(object, glm::vec3(0.5f, 0.5f, 0.5f)); // Gray color
 
     // Add the sliced part to the renderer
     renderer.addObject(objectBelow, glm::vec3(1.0f, 0.0f, 0.0f)); // Red color
